@@ -4,6 +4,7 @@ const { Storage } = require('./storage');
 const { HealthChecker } = require('./healthChecker');
 const { Scheduler } = require('./scheduler');
 const { createApiRouter } = require('./api');
+const { setupWebSocket } = require('./websocket');
 
 const config = require('../config.json');
 
@@ -52,5 +53,7 @@ const server = app.listen(PORT, () => {
   startMonitoring();
 });
 
-// Export for WebSocket setup
-module.exports = { app, server, setBroadcast: (fn) => { broadcast = fn; } };
+// Setup WebSocket
+setupWebSocket(server, (fn) => { broadcast = fn; });
+
+module.exports = { app, server };
