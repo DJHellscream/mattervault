@@ -1,0 +1,20 @@
+services:
+  health-dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile.dashboard
+    ports:
+      - "3005:3000"
+    volumes:
+      - ./data:/app/data
+      - ./config.json:/app/config.json
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    networks:
+      - mattervault
+
+networks:
+  mattervault:
+    external: true
+    name: mattervault_matternet

@@ -1,17 +1,33 @@
 services:
-  health-dashboard:
+  claude-client:
     build: .
+    container_name: claude-orchestrator
+    tty: true
+    stdin_open: true
+
     ports:
-      - "3005:3000"
+      - "3005:3000"  # Expose the dashboard port
+
     volumes:
-      - ./data:/app/data
-      - ./config.json:/app/config.json
+      # 1. YOUR CODE (Maps to Windows D:\CCC)
+      - D:\CCC:/workspace
+
+      # 2. YOUR CLAUDE BRAIN (Persists login, history, plugins)
+      - claude_config:/root/.claude
+
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    restart: unless-stopped
+
     networks:
-      - mattervault
+      - default
+      - matter_bridge
+
+# Define the volume name here
+volumes:
+  claude_config:
 
 networks:
-  mattervault:
+  default:
+  matter_bridge:
     external: true
+    name: mattervault_matternet
