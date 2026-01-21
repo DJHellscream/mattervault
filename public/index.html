@@ -7,58 +7,73 @@
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-  <header>
-    <h1>mattervault health</h1>
-    <span class="last-update">Last update: <span id="lastUpdate">--</span></span>
-  </header>
+  <div class="container">
+    <header>
+      <div class="brand">
+        <span class="brand-label">System Monitor</span>
+        <h1>mattervault</h1>
+      </div>
+      <div class="header-meta">
+        <div class="connection-status">
+          <span class="connection-dot"></span>
+          <span>Live</span>
+        </div>
+        <span class="last-update">Updated <span id="lastUpdate">--</span></span>
+      </div>
+    </header>
 
-  <section class="services-grid" id="servicesGrid">
-    <!-- Service cards rendered by JS -->
-  </section>
+    <section class="services-grid" id="servicesGrid">
+      <!-- Service cards rendered by JS -->
+    </section>
 
-  <section class="history-section">
-    <div class="history-header">
-      <h3>24h History</h3>
-      <select id="historyFilter">
-        <option value="all">All Services</option>
-      </select>
-    </div>
-    <div class="history-bar" id="historyBar">
-      <!-- History segments rendered by JS -->
-    </div>
-    <div class="history-times">
-      <span id="historyStart">--</span>
-      <span id="historyEnd">--</span>
-    </div>
-  </section>
+    <section class="history-section">
+      <div class="history-header">
+        <h3>24h Uptime</h3>
+        <select id="historyFilter">
+          <option value="all">All Services</option>
+        </select>
+      </div>
+      <div class="history-bar-container">
+        <div class="history-bar" id="historyBar">
+          <!-- History segments rendered by JS -->
+        </div>
+      </div>
+      <div class="history-times">
+        <span id="historyStart">--</span>
+        <span id="historyEnd">--</span>
+      </div>
+    </section>
 
-  <section class="details-section hidden" id="detailsSection">
-    <h3>Service Details: <span id="detailsName">--</span></h3>
-    <div class="detail-row">
-      <span class="detail-label">Status</span>
-      <span class="detail-value" id="detailsStatus">--</span>
-    </div>
-    <div class="detail-row">
-      <span class="detail-label">Last Check</span>
-      <span class="detail-value" id="detailsLastCheck">--</span>
-    </div>
-    <div class="detail-row">
-      <span class="detail-label">Response Time</span>
-      <span class="detail-value" id="detailsResponseTime">--</span>
-    </div>
-    <div class="detail-row">
-      <span class="detail-label">Avg Response (24h)</span>
-      <span class="detail-value" id="detailsAvgResponse">--</span>
-    </div>
-    <div class="detail-row">
-      <span class="detail-label">Uptime (24h)</span>
-      <span class="detail-value" id="detailsUptime">--</span>
-    </div>
-    <div class="detail-row" id="detailsErrorRow">
-      <span class="detail-label">Last Error</span>
-      <span class="detail-value" id="detailsError">--</span>
-    </div>
-  </section>
+    <section class="details-section hidden" id="detailsSection">
+      <h3>Service Details — <span id="detailsName">--</span></h3>
+      <div class="details-grid">
+        <div class="detail-item">
+          <span class="detail-label">Status</span>
+          <span class="detail-value" id="detailsStatus">--</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Response Time</span>
+          <span class="detail-value" id="detailsResponseTime">--</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Avg Response (24h)</span>
+          <span class="detail-value" id="detailsAvgResponse">--</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Uptime (24h)</span>
+          <span class="detail-value" id="detailsUptime">--</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Last Check</span>
+          <span class="detail-value" id="detailsLastCheck">--</span>
+        </div>
+        <div class="detail-item hidden" id="detailsErrorRow">
+          <span class="detail-label">Last Error</span>
+          <span class="detail-value" id="detailsError">--</span>
+        </div>
+      </div>
+    </section>
+  </div>
 
   <script>
     let statusData = { services: {} };
@@ -116,13 +131,22 @@
         card.className = 'service-card';
         card.id = `card-${id}`;
         card.onclick = () => selectService(id);
+
+        const responseDisplay = data.responseTime
+          ? `<span class="value">${data.responseTime}</span><span class="unit">ms</span>`
+          : '---';
+
         card.innerHTML = `
           <div class="service-header">
-            <span class="status-dot ${data.status}"></span>
+            <div class="status-indicator">
+              <span class="status-dot ${data.status}"></span>
+            </div>
             <span class="service-name">${id}</span>
           </div>
-          <div class="service-status ${data.status}">${data.status}</div>
-          <div class="response-time">${data.responseTime ? data.responseTime + 'ms' : '---'}</div>
+          <div class="service-metrics">
+            <div class="service-status ${data.status}">${data.status}</div>
+            <div class="response-time">${responseDisplay}</div>
+          </div>
         `;
         grid.appendChild(card);
 
@@ -143,7 +167,11 @@
         card.querySelector('.status-dot').className = `status-dot ${data.status}`;
         card.querySelector('.service-status').className = `service-status ${data.status}`;
         card.querySelector('.service-status').textContent = data.status;
-        card.querySelector('.response-time').textContent = data.responseTime ? data.responseTime + 'ms' : '---';
+
+        const responseDisplay = data.responseTime
+          ? `<span class="value">${data.responseTime}</span><span class="unit">ms</span>`
+          : '---';
+        card.querySelector('.response-time').innerHTML = responseDisplay;
       }
     }
 
@@ -167,8 +195,12 @@
         const current = data.current || {};
         document.getElementById('detailsStatus').textContent = current.status || 'unknown';
         document.getElementById('detailsStatus').className = `detail-value ${current.status || 'unknown'}`;
-        document.getElementById('detailsLastCheck').textContent = current.lastCheck ? new Date(current.lastCheck).toLocaleString() : '--';
-        document.getElementById('detailsResponseTime').textContent = current.responseTime ? current.responseTime + 'ms' : '--';
+        document.getElementById('detailsLastCheck').textContent = current.lastCheck
+          ? new Date(current.lastCheck).toLocaleString()
+          : '--';
+        document.getElementById('detailsResponseTime').textContent = current.responseTime
+          ? current.responseTime + 'ms'
+          : '--';
 
         // Calculate averages from history
         const history = data.history || [];
@@ -187,10 +219,10 @@
         // Show error if down
         const errorRow = document.getElementById('detailsErrorRow');
         if (current.error) {
-          errorRow.style.display = 'flex';
+          errorRow.classList.remove('hidden');
           document.getElementById('detailsError').textContent = current.error;
         } else {
-          errorRow.style.display = 'none';
+          errorRow.classList.add('hidden');
         }
 
         // Update history for this service
