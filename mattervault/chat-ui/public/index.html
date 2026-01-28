@@ -103,6 +103,148 @@
       font-size: 0.95rem;
     }
 
+    /* Document Preview Panel */
+    .doc-preview-panel {
+      position: fixed;
+      top: 0;
+      right: -50%;
+      width: 50%;
+      height: 100vh;
+      background: var(--bg-surface);
+      border-left: 1px solid var(--border-subtle);
+      z-index: 1001;
+      display: flex;
+      flex-direction: column;
+      transition: right 0.3s ease;
+      box-shadow: -4px 0 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .doc-preview-panel.open {
+      right: 0;
+    }
+
+    .doc-preview-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 1000;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.3s ease, visibility 0.3s ease;
+    }
+
+    .doc-preview-overlay.open {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .doc-preview-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border-subtle);
+      background: var(--bg-deep);
+    }
+
+    .doc-preview-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--text-primary);
+      font-weight: 600;
+      font-size: 1rem;
+    }
+
+    .doc-preview-title svg {
+      color: var(--accent-teal);
+    }
+
+    .doc-preview-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .doc-preview-action {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 8px;
+      cursor: pointer;
+      color: var(--text-secondary);
+      transition: all 0.2s ease;
+    }
+
+    .doc-preview-action:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--text-primary);
+    }
+
+    .doc-preview-content {
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+    }
+
+    #docPreviewIframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+      background: white;
+    }
+
+    .doc-preview-loading {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      color: var(--text-secondary);
+    }
+
+    .doc-preview-spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid var(--border-subtle);
+      border-top-color: var(--accent-teal);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    .doc-preview-error {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      color: var(--accent-error);
+      text-align: center;
+      padding: 20px;
+    }
+
+    .doc-preview-error p {
+      color: var(--text-secondary);
+      max-width: 300px;
+    }
+
+    @media (max-width: 1024px) {
+      .doc-preview-panel {
+        width: 80%;
+        right: -80%;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .doc-preview-panel {
+        width: 100%;
+        right: -100%;
+      }
+    }
+
     /* Export dropdown styles */
     .export-dropdown {
       position: relative;
@@ -301,6 +443,55 @@
       background: var(--accent-teal);
       transform: translateX(14px);
     }
+
+    /* Family selector locked state */
+    .family-selector.locked {
+      position: relative;
+    }
+
+    .family-selector.locked select {
+      opacity: 0.7;
+      cursor: not-allowed;
+      padding-right: 36px;
+    }
+
+    .family-selector.locked::after {
+      content: '';
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 16px;
+      height: 16px;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2300d4aa' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='11' width='18' height='11' rx='2' ry='2'%3E%3C/rect%3E%3Cpath d='M7 11V7a5 5 0 0 1 10 0v4'%3E%3C/path%3E%3C/svg%3E");
+      background-size: contain;
+      background-repeat: no-repeat;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    .family-selector.locked .lock-tooltip {
+      position: absolute;
+      bottom: -28px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 6px;
+      padding: 4px 8px;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      white-space: nowrap;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.2s ease, visibility 0.2s ease;
+      z-index: 10;
+    }
+
+    .family-selector.locked:hover .lock-tooltip {
+      opacity: 1;
+      visibility: visible;
+    }
   </style>
 </head>
 <body>
@@ -358,11 +549,12 @@
           <h1>mattervault</h1>
         </div>
         <div class="header-controls">
-          <div class="family-selector">
+          <div class="family-selector" id="familySelector">
             <select id="familySelect" disabled>
               <option value="">Loading families...</option>
             </select>
             <span class="doc-count" id="docCount" style="display: none;"></span>
+            <span class="lock-tooltip">Start a New Chat to change family</span>
           </div>
           <div class="export-dropdown" id="exportDropdown">
             <button class="export-btn" id="exportBtn" title="Export conversation">
@@ -452,6 +644,50 @@
     </div>
   </div>
 
+  <!-- Document Preview Panel -->
+  <div class="doc-preview-panel" id="docPreviewPanel">
+    <div class="doc-preview-header">
+      <div class="doc-preview-title">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+          <polyline points="14 2 14 8 20 8"></polyline>
+        </svg>
+        <span id="docPreviewTitle">Document Preview</span>
+      </div>
+      <div class="doc-preview-actions">
+        <button class="doc-preview-action" id="docOpenNew" title="Open in new tab">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+            <polyline points="15 3 21 3 21 9"></polyline>
+            <line x1="10" y1="14" x2="21" y2="3"></line>
+          </svg>
+        </button>
+        <button class="doc-preview-action" id="docPreviewClose" title="Close preview">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+    </div>
+    <div class="doc-preview-content" id="docPreviewContent">
+      <div class="doc-preview-loading" id="docPreviewLoading">
+        <div class="doc-preview-spinner"></div>
+        <span>Loading document...</span>
+      </div>
+      <iframe id="docPreviewIframe" style="display: none;"></iframe>
+      <div class="doc-preview-error" id="docPreviewError" style="display: none;">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8" x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+        <p id="docPreviewErrorMsg">Failed to load document</p>
+      </div>
+    </div>
+  </div>
+  <div class="doc-preview-overlay" id="docPreviewOverlay"></div>
+
   <script>
     // Auth state
     let accessToken = sessionStorage.getItem('accessToken');
@@ -464,10 +700,12 @@
     let isLoading = false;
     let conversations = [];
     let currentConversationId = null;
+    let currentCitations = [];  // Store citations from n8n response
     let deleteTargetId = null;
 
     // DOM elements
     const authLoading = document.getElementById('authLoading');
+    const familySelector = document.getElementById('familySelector');
     const familySelect = document.getElementById('familySelect');
     const docCount = document.getElementById('docCount');
     const messages = document.getElementById('messages');
@@ -494,6 +732,22 @@
     const exportPdf = document.getElementById('exportPdf');
     const streamingToggle = document.getElementById('streamingToggle');
     const streamingCheckbox = document.getElementById('streamingCheckbox');
+
+    // Document preview elements
+    const docPreviewPanel = document.getElementById('docPreviewPanel');
+    const docPreviewOverlay = document.getElementById('docPreviewOverlay');
+    const docPreviewTitle = document.getElementById('docPreviewTitle');
+    const docPreviewContent = document.getElementById('docPreviewContent');
+    const docPreviewLoading = document.getElementById('docPreviewLoading');
+    const docPreviewIframe = document.getElementById('docPreviewIframe');
+    const docPreviewError = document.getElementById('docPreviewError');
+    const docPreviewErrorMsg = document.getElementById('docPreviewErrorMsg');
+    const docPreviewClose = document.getElementById('docPreviewClose');
+    const docOpenNew = document.getElementById('docOpenNew');
+
+    // Current preview state
+    let currentPreviewDocId = null;
+    let currentPreviewBlobUrl = null;
 
     // Streaming mode state
     let useStreaming = true;
@@ -605,18 +859,20 @@
     // Update user display in header
     function updateUserDisplay() {
       if (currentUser) {
-        const displayName = currentUser.displayName || currentUser.email.split('@')[0];
+        const displayName = currentUser.displayName || currentUser.username || 'User';
         userName.textContent = displayName;
         userAvatar.textContent = displayName.charAt(0).toUpperCase();
-        userFamily.textContent = capitalizeFirst(currentUser.familyId);
+        // Users can access any family, so hide the family badge
+        userFamily.style.display = 'none';
       }
     }
 
-    // Load families from API
+    // Load families from API (fetches from Paperless via auth endpoint)
     async function loadFamilies() {
       try {
-        const res = await authFetch('/api/families');
-        families = await res.json();
+        const res = await authFetch('/api/auth/families');
+        const data = await res.json();
+        families = data.families || [];
 
         familySelect.innerHTML = '<option value="">Select a family...</option>';
         families.forEach(family => {
@@ -627,15 +883,6 @@
         });
 
         familySelect.disabled = false;
-
-        // If user has a family_id, pre-select it
-        if (currentUser && currentUser.familyId) {
-          const userFamilyOption = families.find(f => f.slug === currentUser.familyId);
-          if (userFamilyOption) {
-            familySelect.value = currentUser.familyId;
-            onFamilyChange();
-          }
-        }
       } catch (err) {
         console.error('Failed to load families:', err);
         familySelect.innerHTML = '<option value="">Error loading families</option>';
@@ -703,8 +950,9 @@
           familySelect.value = conv.familyId;
           selectedFamily = families.find(f => f.slug === conv.familyId);
           if (selectedFamily) {
-            const docLabel = selectedFamily.paperless_docs === 1 ? 'document' : 'documents';
-            docCount.textContent = `${selectedFamily.paperless_docs} ${docLabel}`;
+            const numDocs = selectedFamily.document_count || 0;
+            const docLabel = numDocs === 1 ? 'document' : 'documents';
+            docCount.textContent = `${numDocs} ${docLabel}`;
             docCount.style.display = '';
             questionInput.disabled = false;
             sendBtn.disabled = false;
@@ -712,11 +960,23 @@
           }
         }
 
+        // Lock family selector for existing conversations
+        lockFamilySelector();
+
         // Clear messages and display conversation
         messages.innerHTML = '';
         conv.messages.forEach(msg => {
           if (msg.role === 'user' || msg.role === 'assistant') {
-            addMessage(msg.role, msg.content);
+            // Parse citations if they're stored as JSON string
+            let citations = msg.citations || [];
+            if (typeof citations === 'string') {
+              try {
+                citations = JSON.parse(citations);
+              } catch (e) {
+                citations = [];
+              }
+            }
+            addMessage(msg.role, msg.content, false, citations);
           }
         });
 
@@ -750,6 +1010,10 @@
           <p>Select a family and ask a question about their documents.</p>
         </div>
       `;
+
+      // Unlock family selector for new chat
+      unlockFamilySelector();
+
       renderConversationList();
       updateExportVisibility();
       closeMobileSidebar();
@@ -836,6 +1100,18 @@
         streamingCheckbox.checked = useStreaming;
         streamingToggle.classList.toggle('active', useStreaming);
       });
+
+      // Document preview panel
+      docPreviewClose.addEventListener('click', closeDocPreview);
+      docPreviewOverlay.addEventListener('click', closeDocPreview);
+      docOpenNew.addEventListener('click', openPreviewInNewTab);
+
+      // Close preview with Escape key
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && docPreviewPanel.classList.contains('open')) {
+          closeDocPreview();
+        }
+      });
     }
 
     // Toggle sidebar (desktop)
@@ -853,6 +1129,21 @@
     function closeMobileSidebar() {
       sidebar.classList.remove('mobile-open');
       sidebarOverlay.classList.remove('active');
+    }
+
+    // Lock family selector (called when chat starts)
+    function lockFamilySelector() {
+      familySelector.classList.add('locked');
+      familySelect.disabled = true;
+    }
+
+    // Unlock family selector (called when starting new chat)
+    function unlockFamilySelector() {
+      familySelector.classList.remove('locked');
+      // Only enable if families are loaded
+      if (families.length > 0) {
+        familySelect.disabled = false;
+      }
     }
 
     // Handle logout
@@ -887,9 +1178,13 @@
       }
 
       selectedFamily = families.find(f => f.slug === slug);
-      const docLabel = selectedFamily.paperless_docs === 1 ? 'document' : 'documents';
-      docCount.textContent = `${selectedFamily.paperless_docs} ${docLabel}`;
+
+      // Show document count
+      const numDocs = selectedFamily.document_count || 0;
+      const docLabel = numDocs === 1 ? 'document' : 'documents';
+      docCount.textContent = `${numDocs} ${docLabel}`;
       docCount.style.display = '';
+
       questionInput.disabled = false;
       sendBtn.disabled = false;
       inputHint.textContent = `Asking about ${capitalizeFirst(selectedFamily.name)} family documents`;
@@ -903,7 +1198,7 @@
 
       // Add system message if starting fresh (no current conversation)
       if (!currentConversationId) {
-        addMessage('system', `Now chatting about ${capitalizeFirst(selectedFamily.name)} family (${selectedFamily.paperless_docs} ${docLabel}, ${selectedFamily.indexed_docs} chunks indexed).`);
+        addMessage('system', `Now chatting about ${capitalizeFirst(selectedFamily.name)} family (${numDocs} ${docLabel}).`);
       }
     }
 
@@ -919,6 +1214,9 @@
     async function sendNonStreamingMessage() {
       const question = questionInput.value.trim();
       if (!question || !selectedFamily || isLoading) return;
+
+      // Lock family selector once chat starts
+      lockFamilySelector();
 
       // Add user message
       addMessage('user', question);
@@ -977,9 +1275,15 @@
       const question = questionInput.value.trim();
       if (!question || !selectedFamily || isLoading) return;
 
+      // Lock family selector once chat starts
+      lockFamilySelector();
+
       // Add user message
       addMessage('user', question);
       questionInput.value = '';
+
+      // Reset citations for new message
+      currentCitations = [];
 
       // Show loading
       isLoading = true;
@@ -1104,6 +1408,10 @@
                       currentConversationId = parsed.conversation_id;
                       updateExportVisibility();
                     }
+                    // Store citations for use in formatting
+                    if (parsed.citations && Array.isArray(parsed.citations)) {
+                      currentCitations = parsed.citations;
+                    }
                     break;
 
                   case 'error':
@@ -1120,8 +1428,9 @@
 
         // Finalize message display
         messageDiv.classList.remove('streaming');
-        contentDiv.innerHTML = formatMessage(fullText);
+        contentDiv.innerHTML = formatMessage(fullText, currentCitations);
         messageDiv.dataset.rawContent = deduplicateSources(fullText);
+        currentCitations = [];  // Reset citations for next message
 
         // Refresh conversations list
         await loadConversations();
@@ -1177,7 +1486,8 @@
     }
 
     // Add message to chat
-    function addMessage(type, content, isLoading = false) {
+    // citations: optional array of {source, page, document_id} for making sources clickable
+    function addMessage(type, content, isLoading = false, citations = []) {
       const id = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
       const div = document.createElement('div');
       div.id = id;
@@ -1206,10 +1516,14 @@
               </button>
             ` : ''}
           </div>
-          <div class="message-content">${formatMessage(content)}</div>
+          <div class="message-content">${formatMessage(content, citations)}</div>
         `;
         // Store deduplicated content for copying
         div.dataset.rawContent = deduplicateSources(content);
+        // Store citations for potential re-use
+        if (citations && citations.length > 0) {
+          div.dataset.citations = JSON.stringify(citations);
+        }
       }
 
       messages.appendChild(div);
@@ -1250,8 +1564,19 @@
     }
 
     // Format message content (basic markdown-like formatting)
-    function formatMessage(text) {
+    function formatMessage(text, citations = []) {
       if (!text) return '';
+
+      // Build citation lookup map from structured citations
+      const citationMap = new Map();
+      if (citations && Array.isArray(citations)) {
+        citations.forEach(c => {
+          if (c.document_id && c.source) {
+            // Map document title (or partial match) to document ID
+            citationMap.set(c.source.toLowerCase(), { docId: c.document_id, page: c.page });
+          }
+        });
+      }
 
       // Deduplicate sources in "Sources consulted" section
       text = deduplicateSources(text);
@@ -1275,11 +1600,20 @@
 
       // Make source citations clickable
       // Format: (Source: filename.pdf, Page X) or (Source: filename.pdf (Page X))
-      // Extract document ID if embedded: [doc:123]filename.pdf
+      // Extract document ID if embedded: [doc:123]filename.pdf or from citations map
       formatted = formatted.replace(
         /\(Source: (?:\[doc:(\d+)\])?([^,)]+?)(?:,?\s*(?:\()?[Pp]age\s*(\d+)(?:\))?)?\)/g,
-        (match, docId, filename, page) => {
+        (match, embeddedDocId, filename, page) => {
           const displayText = page ? `${filename}, Page ${page}` : filename;
+          // First check for embedded doc ID, then look up in citations map
+          let docId = embeddedDocId;
+          if (!docId && citationMap.size > 0) {
+            const key = filename.toLowerCase().trim();
+            const citation = citationMap.get(key);
+            if (citation) {
+              docId = citation.docId;
+            }
+          }
           if (docId) {
             // We have a document ID - make it clickable
             return `<a href="#" class="source-citation clickable" onclick="previewDocument('${docId}', ${page || 1}); return false;" title="Click to view document">(Source: ${displayText})</a>`;
@@ -1302,6 +1636,22 @@
           return `<span class="source-citation">(Source ${sourceNum}: ${details})</span>`;
         }
       );
+
+      // Make "Sources consulted" list items clickable using citation map
+      if (citationMap.size > 0) {
+        formatted = formatted.replace(
+          /- ([^,<]+?)(?:, Page (\d+))?(<br>|$)/g,
+          (match, title, page, ending) => {
+            const key = title.toLowerCase().trim();
+            const citation = citationMap.get(key);
+            if (citation) {
+              const displayPage = page || citation.page || 1;
+              return `- <a href="#" class="source-citation clickable" onclick="previewDocument('${citation.docId}', ${displayPage}); return false;" title="Click to view document">${title}${page ? ', Page ' + page : ''}</a>${ending}`;
+            }
+            return match;
+          }
+        );
+      }
 
       return formatted;
     }
@@ -1362,20 +1712,95 @@
     }
 
     /**
-     * Preview a document in a new tab
+     * Preview a document in the slide-out panel
      * @param {string} docId - The Paperless document ID
-     * @param {number} page - The page number to navigate to (optional, for future PDF.js integration)
+     * @param {number} page - The page number to navigate to
+     * @param {string} title - Optional document title for display
      */
-    function previewDocument(docId, page) {
+    async function previewDocument(docId, page, title) {
       if (!docId) {
         console.warn('No document ID provided for preview');
         return;
       }
 
-      // Open PDF in new tab
-      // The page parameter is included for future enhancement with PDF.js viewer
-      const url = `/api/documents/${docId}/preview` + (page ? `#page=${page}` : '');
-      window.open(url, '_blank');
+      // Clean up previous blob URL if exists
+      if (currentPreviewBlobUrl) {
+        URL.revokeObjectURL(currentPreviewBlobUrl);
+        currentPreviewBlobUrl = null;
+      }
+
+      currentPreviewDocId = docId;
+
+      // Show panel and loading state
+      docPreviewPanel.classList.add('open');
+      docPreviewOverlay.classList.add('open');
+      docPreviewLoading.style.display = 'flex';
+      docPreviewIframe.style.display = 'none';
+      docPreviewError.style.display = 'none';
+      docPreviewTitle.textContent = title || 'Loading document...';
+
+      try {
+        // Fetch PDF with auth header
+        const response = await fetch(`/api/documents/${docId}/preview`, {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`
+          }
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || `Failed to load document (${response.status})`);
+        }
+
+        // Get the PDF blob
+        const blob = await response.blob();
+        currentPreviewBlobUrl = URL.createObjectURL(blob);
+
+        // Get document title from Content-Disposition header or use provided
+        const contentDisposition = response.headers.get('Content-Disposition');
+        let docTitle = title;
+        if (!docTitle && contentDisposition) {
+          const match = contentDisposition.match(/filename="([^"]+)"/);
+          if (match) docTitle = match[1].replace('.pdf', '');
+        }
+        docPreviewTitle.textContent = docTitle || `Document ${docId}`;
+
+        // Load in iframe with page navigation
+        docPreviewIframe.src = currentPreviewBlobUrl + (page ? `#page=${page}` : '');
+        docPreviewIframe.style.display = 'block';
+        docPreviewLoading.style.display = 'none';
+
+      } catch (err) {
+        console.error('Error loading document preview:', err);
+        docPreviewLoading.style.display = 'none';
+        docPreviewError.style.display = 'flex';
+        docPreviewErrorMsg.textContent = err.message;
+      }
+    }
+
+    /**
+     * Close the document preview panel
+     */
+    function closeDocPreview() {
+      docPreviewPanel.classList.remove('open');
+      docPreviewOverlay.classList.remove('open');
+      docPreviewIframe.src = '';
+
+      // Clean up blob URL
+      if (currentPreviewBlobUrl) {
+        URL.revokeObjectURL(currentPreviewBlobUrl);
+        currentPreviewBlobUrl = null;
+      }
+      currentPreviewDocId = null;
+    }
+
+    /**
+     * Open current preview document in new tab
+     */
+    function openPreviewInNewTab() {
+      if (currentPreviewBlobUrl) {
+        window.open(currentPreviewBlobUrl, '_blank');
+      }
     }
 
     /**
