@@ -91,7 +91,7 @@ DOCS_JSON=$(docker exec "$CONTAINER" wget -q -O - \
     "$PAPERLESS_URL/api/documents/" 2>/dev/null || echo '{"results":[]}')
 
 # Extract document IDs that have morrison in their correspondent or tags
-DOC_IDS=$(echo "$DOCS_JSON" | grep -o '"id":[0-9]*' | cut -d: -f2 | head -20)
+DOC_IDS=$(echo "$DOCS_JSON" | grep -o '"id":[0-9]*' | cut -d: -f2 | head -20 || true)
 
 if [[ -z "$DOC_IDS" ]]; then
     echo "  No documents found in Paperless"
@@ -117,10 +117,34 @@ req.end();
     done
 fi
 
-# Step 3: Empty Paperless trash (note: with default settings, deletes are immediate)
+# Step 3: Empty Paperless trash via database
 echo ""
-echo "[3/5] Emptying Paperless trash..."
-echo "✓ Documents permanently deleted (no trash with default settings)"
+echo "[3/5] Emptying Paperless trash via database..."
+
+# Get trashed document IDs from Paperless database
+TRASHED_IDS=$(docker exec matterdb-paperless psql -U paperless -d paperless -t -A -c \
+    "SELECT id FROM documents_document WHERE deleted_at IS NOT NULL;" 2>/dev/null || echo "")
+
+if [[ -z "$TRASHED_IDS" || "$TRASHED_IDS" == "" ]]; then
+    echo "  No documents in trash"
+else
+    TRASH_COUNT=$(echo "$TRASHED_IDS" | wc -l)
+    echo "  Found $TRASH_COUNT document(s) in trash, permanently deleting..."
+
+    for doc_id in $TRASHED_IDS; do
+        echo -n "  Permanently deleting document $doc_id... "
+        # Delete in correct order to handle foreign key constraints
+        docker exec matterdb-paperless psql -U paperless -d paperless -c "
+            DELETE FROM documents_document_tags WHERE document_id = $doc_id;
+            DELETE FROM documents_note WHERE document_id = $doc_id;
+            DELETE FROM documents_sharelink WHERE document_id = $doc_id;
+            DELETE FROM documents_customfieldinstance WHERE document_id = $doc_id;
+            DELETE FROM documents_workflowrun WHERE document_id = $doc_id;
+            DELETE FROM documents_document WHERE id = $doc_id;
+        " >/dev/null 2>&1 && echo "✓" || echo "✗"
+    done
+fi
+echo "✓ Trash emptied"
 
 # Step 4: Delete Morrison vectors from Qdrant
 echo ""
