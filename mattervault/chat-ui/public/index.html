@@ -113,57 +113,109 @@
     </div>
   </div>
 
-  <div class="container">
-    <header>
-      <div class="brand">
-        <span class="brand-label">Document Intelligence</span>
-        <h1>mattervault</h1>
+  <div class="app-layout">
+    <!-- Sidebar for conversation history -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <button class="new-chat-btn" id="newChatBtn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+          New Chat
+        </button>
+        <button class="sidebar-toggle" id="sidebarToggle" title="Toggle sidebar">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
+          </svg>
+        </button>
       </div>
-      <div class="header-controls">
-        <div class="family-selector">
-          <select id="familySelect" disabled>
-            <option value="">Loading families...</option>
-          </select>
-          <span class="doc-count" id="docCount" style="display: none;"></span>
+      <div class="conversation-list" id="conversationList">
+        <div class="conversation-empty">
+          <p>No conversations yet</p>
+          <p class="hint">Start a new chat to begin</p>
         </div>
-        <div class="user-menu" id="userMenu">
-          <div class="user-info">
-            <div class="user-avatar" id="userAvatar">?</div>
-            <div>
-              <div class="user-name" id="userName">User</div>
-              <div class="user-family" id="userFamily"></div>
+      </div>
+    </aside>
+
+    <!-- Mobile sidebar toggle -->
+    <button class="mobile-sidebar-toggle" id="mobileSidebarToggle">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="3" y1="12" x2="21" y2="12"></line>
+        <line x1="3" y1="6" x2="21" y2="6"></line>
+        <line x1="3" y1="18" x2="21" y2="18"></line>
+      </svg>
+    </button>
+
+    <!-- Sidebar overlay for mobile -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <div class="container">
+      <header>
+        <div class="brand">
+          <span class="brand-label">Document Intelligence</span>
+          <h1>mattervault</h1>
+        </div>
+        <div class="header-controls">
+          <div class="family-selector">
+            <select id="familySelect" disabled>
+              <option value="">Loading families...</option>
+            </select>
+            <span class="doc-count" id="docCount" style="display: none;"></span>
+          </div>
+          <div class="user-menu" id="userMenu">
+            <div class="user-info">
+              <div class="user-avatar" id="userAvatar">?</div>
+              <div>
+                <div class="user-name" id="userName">User</div>
+                <div class="user-family" id="userFamily"></div>
+              </div>
             </div>
+            <button class="logout-btn" id="logoutBtn">Logout</button>
           </div>
-          <button class="logout-btn" id="logoutBtn">Logout</button>
         </div>
-      </div>
-    </header>
+      </header>
 
-    <main class="chat-container">
-      <div class="messages" id="messages">
-        <div class="welcome-message">
-          <div class="welcome-icon">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-            </svg>
+      <main class="chat-container">
+        <div class="messages" id="messages">
+          <div class="welcome-message">
+            <div class="welcome-icon">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+              </svg>
+            </div>
+            <h2>Welcome to Mattervault</h2>
+            <p>Select a family above to start asking questions about their documents.</p>
           </div>
-          <h2>Welcome to Mattervault</h2>
-          <p>Select a family above to start asking questions about their documents.</p>
         </div>
-      </div>
 
-      <div class="input-area">
-        <div class="input-wrapper">
-          <input type="text" id="questionInput" placeholder="Type your question..." disabled>
-          <button id="sendBtn" disabled>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
-            </svg>
-          </button>
+        <div class="input-area">
+          <div class="input-wrapper">
+            <input type="text" id="questionInput" placeholder="Type your question..." disabled>
+            <button id="sendBtn" disabled>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+              </svg>
+            </button>
+          </div>
+          <div class="input-hint" id="inputHint">Select a family to start chatting</div>
         </div>
-        <div class="input-hint" id="inputHint">Select a family to start chatting</div>
+      </main>
+    </div>
+  </div>
+
+  <!-- Delete confirmation modal -->
+  <div class="modal-overlay" id="deleteModal">
+    <div class="modal">
+      <h3>Delete Conversation</h3>
+      <p>Are you sure you want to delete this conversation? This action cannot be undone.</p>
+      <div class="modal-actions">
+        <button class="modal-cancel" id="deleteCancel">Cancel</button>
+        <button class="modal-confirm" id="deleteConfirm">Delete</button>
       </div>
-    </main>
+    </div>
   </div>
 
   <script>
@@ -176,6 +228,9 @@
     let selectedFamily = null;
     let sessionId = `chat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     let isLoading = false;
+    let conversations = [];
+    let currentConversationId = null;
+    let deleteTargetId = null;
 
     // DOM elements
     const authLoading = document.getElementById('authLoading');
@@ -190,6 +245,15 @@
     const userName = document.getElementById('userName');
     const userFamily = document.getElementById('userFamily');
     const logoutBtn = document.getElementById('logoutBtn');
+    const sidebar = document.getElementById('sidebar');
+    const sidebarToggle = document.getElementById('sidebarToggle');
+    const mobileSidebarToggle = document.getElementById('mobileSidebarToggle');
+    const sidebarOverlay = document.getElementById('sidebarOverlay');
+    const newChatBtn = document.getElementById('newChatBtn');
+    const conversationList = document.getElementById('conversationList');
+    const deleteModal = document.getElementById('deleteModal');
+    const deleteCancel = document.getElementById('deleteCancel');
+    const deleteConfirm = document.getElementById('deleteConfirm');
 
     // Initialize
     async function init() {
@@ -206,8 +270,8 @@
       // Update user display
       updateUserDisplay();
 
-      // Load families and setup
-      await loadFamilies();
+      // Load families and conversations
+      await Promise.all([loadFamilies(), loadConversations()]);
       setupEventListeners();
     }
 
@@ -335,6 +399,147 @@
       }
     }
 
+    // Load conversations from API
+    async function loadConversations() {
+      try {
+        const res = await authFetch('/api/conversations?limit=50');
+        const data = await res.json();
+        conversations = data.conversations || [];
+        renderConversationList();
+      } catch (err) {
+        console.error('Failed to load conversations:', err);
+      }
+    }
+
+    // Render conversation list in sidebar
+    function renderConversationList() {
+      if (conversations.length === 0) {
+        conversationList.innerHTML = `
+          <div class="conversation-empty">
+            <p>No conversations yet</p>
+            <p class="hint">Start a new chat to begin</p>
+          </div>
+        `;
+        return;
+      }
+
+      conversationList.innerHTML = conversations.map(conv => `
+        <div class="conversation-item ${conv.id === currentConversationId ? 'active' : ''}"
+             data-id="${conv.id}"
+             data-family="${conv.familyId}">
+          <div class="conversation-content" onclick="loadConversation('${conv.id}')">
+            <div class="conversation-title">${escapeHtml(conv.title || 'Untitled')}</div>
+            <div class="conversation-meta">
+              <span class="conversation-family">${capitalizeFirst(conv.familyId)}</span>
+              <span class="conversation-time">${formatRelativeTime(conv.updatedAt)}</span>
+            </div>
+          </div>
+          <button class="conversation-delete" onclick="confirmDeleteConversation('${conv.id}')" title="Delete conversation">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
+          </button>
+        </div>
+      `).join('');
+    }
+
+    // Load a specific conversation
+    async function loadConversation(conversationId) {
+      try {
+        const res = await authFetch(`/api/conversations/${conversationId}`);
+        if (!res.ok) {
+          throw new Error('Failed to load conversation');
+        }
+
+        const conv = await res.json();
+        currentConversationId = conv.id;
+
+        // Set family selector to conversation's family
+        if (conv.familyId && familySelect.value !== conv.familyId) {
+          familySelect.value = conv.familyId;
+          selectedFamily = families.find(f => f.slug === conv.familyId);
+          if (selectedFamily) {
+            const docLabel = selectedFamily.paperless_docs === 1 ? 'document' : 'documents';
+            docCount.textContent = `${selectedFamily.paperless_docs} ${docLabel}`;
+            docCount.style.display = '';
+            questionInput.disabled = false;
+            sendBtn.disabled = false;
+            inputHint.textContent = `Asking about ${capitalizeFirst(selectedFamily.name)} family documents`;
+          }
+        }
+
+        // Clear messages and display conversation
+        messages.innerHTML = '';
+        conv.messages.forEach(msg => {
+          if (msg.role === 'user' || msg.role === 'assistant') {
+            addMessage(msg.role, msg.content);
+          }
+        });
+
+        // Update sidebar highlight
+        renderConversationList();
+
+        // Close mobile sidebar
+        closeMobileSidebar();
+
+        questionInput.focus();
+      } catch (err) {
+        console.error('Failed to load conversation:', err);
+        addMessage('error', 'Failed to load conversation');
+      }
+    }
+
+    // Start a new chat
+    function startNewChat() {
+      currentConversationId = null;
+      messages.innerHTML = `
+        <div class="welcome-message">
+          <div class="welcome-icon">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            </svg>
+          </div>
+          <h2>New Conversation</h2>
+          <p>Select a family and ask a question about their documents.</p>
+        </div>
+      `;
+      renderConversationList();
+      closeMobileSidebar();
+      questionInput.focus();
+    }
+
+    // Confirm delete conversation
+    function confirmDeleteConversation(conversationId) {
+      deleteTargetId = conversationId;
+      deleteModal.classList.add('active');
+    }
+
+    // Delete conversation
+    async function deleteConversation(conversationId) {
+      try {
+        const res = await authFetch(`/api/conversations/${conversationId}`, {
+          method: 'DELETE'
+        });
+
+        if (!res.ok) {
+          throw new Error('Failed to delete conversation');
+        }
+
+        // Remove from local list
+        conversations = conversations.filter(c => c.id !== conversationId);
+        renderConversationList();
+
+        // If deleted current conversation, start new chat
+        if (currentConversationId === conversationId) {
+          startNewChat();
+        }
+      } catch (err) {
+        console.error('Failed to delete conversation:', err);
+        addMessage('error', 'Failed to delete conversation');
+      }
+    }
+
     // Setup event listeners
     function setupEventListeners() {
       familySelect.addEventListener('change', onFamilyChange);
@@ -346,6 +551,42 @@
         }
       });
       logoutBtn.addEventListener('click', logout);
+      newChatBtn.addEventListener('click', startNewChat);
+
+      // Sidebar toggles
+      sidebarToggle.addEventListener('click', toggleSidebar);
+      mobileSidebarToggle.addEventListener('click', toggleMobileSidebar);
+      sidebarOverlay.addEventListener('click', closeMobileSidebar);
+
+      // Delete modal
+      deleteCancel.addEventListener('click', () => {
+        deleteModal.classList.remove('active');
+        deleteTargetId = null;
+      });
+      deleteConfirm.addEventListener('click', async () => {
+        if (deleteTargetId) {
+          await deleteConversation(deleteTargetId);
+          deleteModal.classList.remove('active');
+          deleteTargetId = null;
+        }
+      });
+    }
+
+    // Toggle sidebar (desktop)
+    function toggleSidebar() {
+      sidebar.classList.toggle('collapsed');
+    }
+
+    // Toggle mobile sidebar
+    function toggleMobileSidebar() {
+      sidebar.classList.toggle('mobile-open');
+      sidebarOverlay.classList.toggle('active');
+    }
+
+    // Close mobile sidebar
+    function closeMobileSidebar() {
+      sidebar.classList.remove('mobile-open');
+      sidebarOverlay.classList.remove('active');
     }
 
     // Handle logout
@@ -394,8 +635,10 @@
         welcome.remove();
       }
 
-      // Add system message
-      addMessage('system', `Now chatting about ${capitalizeFirst(selectedFamily.name)} family (${selectedFamily.paperless_docs} ${docLabel}, ${selectedFamily.indexed_docs} chunks indexed).`);
+      // Add system message if starting fresh (no current conversation)
+      if (!currentConversationId) {
+        addMessage('system', `Now chatting about ${capitalizeFirst(selectedFamily.name)} family (${selectedFamily.paperless_docs} ${docLabel}, ${selectedFamily.indexed_docs} chunks indexed).`);
+      }
     }
 
     // Send message
@@ -419,7 +662,8 @@
           body: JSON.stringify({
             family_id: selectedFamily.slug,
             question: question,
-            session_id: sessionId
+            session_id: sessionId,
+            conversation_id: currentConversationId
           })
         });
 
@@ -429,6 +673,13 @@
         removeMessage(loadingId);
 
         if (res.ok) {
+          // Update conversation ID if new conversation was created
+          if (data.conversation_id && !currentConversationId) {
+            currentConversationId = data.conversation_id;
+            // Reload conversations to show the new one
+            await loadConversations();
+          }
+
           // Handle the response - could be text or structured
           const answer = data.text || data.output || data.answer || data.response || JSON.stringify(data);
           addMessage('assistant', answer);
@@ -574,6 +825,29 @@
 
       const newSection = header + '\n' + uniqueLines.join('\n');
       return text.replace(sourcesSection, newSection);
+    }
+
+    // Format relative time
+    function formatRelativeTime(dateString) {
+      const date = new Date(dateString);
+      const now = new Date();
+      const diffMs = now - date;
+      const diffMins = Math.floor(diffMs / 60000);
+      const diffHours = Math.floor(diffMs / 3600000);
+      const diffDays = Math.floor(diffMs / 86400000);
+
+      if (diffMins < 1) return 'Just now';
+      if (diffMins < 60) return `${diffMins}m ago`;
+      if (diffHours < 24) return `${diffHours}h ago`;
+      if (diffDays < 7) return `${diffDays}d ago`;
+      return date.toLocaleDateString();
+    }
+
+    // Escape HTML
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
     }
 
     // Utility
