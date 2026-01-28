@@ -179,7 +179,7 @@
       {
         "parameters": {
           "method": "POST",
-          "url": "http://host.docker.internal:5001/v1/convert/file/async",
+          "url": "http://host.docker.internal:5001/v1/chunk/hierarchical/file/async",
           "sendBody": true,
           "contentType": "multipart-form-data",
           "bodyParameters": {
@@ -192,7 +192,7 @@
               {
                 "parameterType": "formData",
                 "name": "options",
-                "value": "{\"do_ocr\": true, \"force_ocr\": false, \"ocr_lang\": \"en\", \"to_formats\": [\"md\", \"json_docling\"], \"md_page_break_placeholder\": \"<!-- PAGE_BREAK -->\"}"
+                "value": "{\"do_ocr\": true, \"force_ocr\": false, \"ocr_lang\": \"en\"}"
               }
             ]
           },
@@ -201,7 +201,7 @@
           }
         },
         "id": "http-docling-start",
-        "name": "Start Docling Conversion",
+        "name": "Start Docling Chunking",
         "type": "n8n-nodes-base.httpRequest",
         "typeVersion": 4.2,
         "position": [
@@ -211,7 +211,7 @@
       },
       {
         "parameters": {
-          "jsCode": "// Extract task_id from Docling response\nconst response = $input.first().json;\nconsole.log('Docling start response:', JSON.stringify(response));\n\nconst taskId = response.task_id || response.id || response.taskId;\n\nif (!taskId) {\n  // Maybe it returned the result directly (sync mode)?\n  if (response.document || response.documents || response.md_content) {\n    // Direct result - skip polling\n    return [{ json: { direct_result: true, result: response } }];\n  }\n  throw new Error('No task_id in Docling response: ' + JSON.stringify(response));\n}\n\nreturn [{ json: { task_id: taskId, poll_count: 0, direct_result: false } }];"
+          "jsCode": "// Extract task_id from Docling chunking response\nconst response = $input.first().json;\nconsole.log('Docling chunking response keys:', Object.keys(response));\n\nconst taskId = response.task_id || response.id || response.taskId;\n\nif (!taskId) {\n  // Maybe it returned the result directly (sync mode)?\n  // Chunking endpoint returns 'chunks' array directly\n  if (response.chunks || response.document || response.documents) {\n    // Direct result - skip polling\n    console.log('Direct result received with', (response.chunks || []).length, 'chunks');\n    return [{ json: { direct_result: true, result: response } }];\n  }\n  throw new Error('No task_id in Docling response: ' + JSON.stringify(Object.keys(response)));\n}\n\nconsole.log('Async task started:', taskId);\nreturn [{ json: { task_id: taskId, poll_count: 0, direct_result: false } }];"
         },
         "id": "code-extract-task",
         "name": "Extract Task ID",
@@ -343,7 +343,7 @@
           }
         },
         "id": "http-get-result",
-        "name": "Get Conversion Result",
+        "name": "Get Chunking Result",
         "type": "n8n-nodes-base.httpRequest",
         "typeVersion": 4.2,
         "position": [
@@ -353,10 +353,10 @@
       },
       {
         "parameters": {
-          "jsCode": "// Get result from either direct response or fetched result\nlet doclingResponse;\ntry {\n  const directCheck = $('Direct Result?');\n  if (directCheck && directCheck.first) {\n    const directItem = directCheck.first();\n    if (directItem && directItem.json) {\n      const directData = directItem.json;\n      if (directData.direct_result && directData.result) {\n        doclingResponse = directData.result;\n      }\n    }\n  }\n} catch (e) {\n  // Direct result not available, will use input\n}\nif (!doclingResponse) {\n  doclingResponse = $input.first().json;\n}\n\nconst extractNode = $('Extract Document Info').first().json;\nconst documentId = extractNode.document_id;\nconst familyId = extractNode.family_id;\nconst title = extractNode.title;\n\nlet markdown = '';\nlet pageData = []; // Array of {page: N, text: '...'} for page tracking\n\nconsole.log('Docling result keys:', Object.keys(doclingResponse));\n\n// Method 1: Try to get page info from json_content (best source)\nconst doc = doclingResponse.document || doclingResponse;\nconst jsonContent = doc.json_content;\n\nif (jsonContent && typeof jsonContent === 'object' && jsonContent.texts) {\n  console.log('Using json_content for page tracking');\n  \n  // Group texts by page\n  const pageTexts = {};\n  for (const textItem of jsonContent.texts) {\n    // Get page number from provenance\n    const pageNum = textItem.prov?.[0]?.page_no || textItem.page || 1;\n    if (!pageTexts[pageNum]) pageTexts[pageNum] = [];\n    pageTexts[pageNum].push(textItem.text || '');\n  }\n  \n  // Create pageData from grouped texts\n  Object.keys(pageTexts).sort((a,b) => a-b).forEach(pageNum => {\n    pageData.push({\n      page: parseInt(pageNum),\n      text: pageTexts[pageNum].join('\\n\\n')\n    });\n  });\n  \n  console.log('Extracted', pageData.length, 'pages from json_content');\n}\n\n// Method 2: Try page break placeholders in markdown\nif (pageData.length === 0) {\n  markdown = doc.md_content || doclingResponse.md_content || '';\n  \n  if (markdown.includes('<!-- PAGE_BREAK -->')) {\n    console.log('Using PAGE_BREAK markers for page tracking');\n    const pages = markdown.split('<!-- PAGE_BREAK -->');\n    pages.forEach((pageText, idx) => {\n      if (pageText.trim()) {\n        pageData.push({ page: idx + 1, text: pageText.trim() });\n      }\n    });\n    console.log('Extracted', pageData.length, 'pages from markers');\n  }\n}\n\n// Method 3: Fall back to character-based estimation\nif (pageData.length === 0 && markdown) {\n  console.log('Falling back to character-based page estimation');\n  const CHARS_PER_PAGE = 3000;\n  for (let i = 0; i < markdown.length; i += CHARS_PER_PAGE) {\n    const pageNum = Math.floor(i / CHARS_PER_PAGE) + 1;\n    const pageText = markdown.substring(i, i + CHARS_PER_PAGE);\n    pageData.push({ page: pageNum, text: pageText });\n  }\n  console.log('Estimated', pageData.length, 'pages');\n}\n\n// If still no data, use full markdown as page 1\nif (pageData.length === 0) {\n  markdown = doc.md_content || doclingResponse.md_content || '';\n  if (markdown) {\n    pageData.push({ page: 1, text: markdown });\n  }\n}\n\nconsole.log('Total pages for chunking:', pageData.length);\n\n// Create chunks with proper page numbers\nconst chunks = [];\nconst MIN_CHUNK_SIZE = 100;\nconst MAX_CHUNK_SIZE = 1500;\n\nfor (const pageInfo of pageData) {\n  const pageText = pageInfo.text.trim();\n  if (!pageText) continue;\n  \n  // Split by headers or paragraphs\n  let sections = pageText.split(/(?=^#{1,3} )/gm).filter(s => s.trim().length > 20);\n  if (sections.length === 0) sections = [pageText];\n  \n  for (const section of sections) {\n    // Further split if too large\n    if (section.length > MAX_CHUNK_SIZE) {\n      const paragraphs = section.split(/\\n\\n+/);\n      let currentChunk = '';\n      for (const para of paragraphs) {\n        if (currentChunk.length + para.length > MAX_CHUNK_SIZE && currentChunk.length >= MIN_CHUNK_SIZE) {\n          chunks.push({\n            text: currentChunk.trim(),\n            page_num: pageInfo.page,\n            document_id: documentId,\n            family_id: familyId,\n            document_title: title,\n            chunk_index: chunks.length\n          });\n          currentChunk = para;\n        } else {\n          currentChunk += (currentChunk ? '\\n\\n' : '') + para;\n        }\n      }\n      if (currentChunk.trim().length >= MIN_CHUNK_SIZE) {\n        chunks.push({\n          text: currentChunk.trim(),\n          page_num: pageInfo.page,\n          document_id: documentId,\n          family_id: familyId,\n          document_title: title,\n          chunk_index: chunks.length\n        });\n      }\n    } else if (section.trim().length >= MIN_CHUNK_SIZE) {\n      chunks.push({\n        text: section.trim(),\n        page_num: pageInfo.page,\n        document_id: documentId,\n        family_id: familyId,\n        document_title: title,\n        chunk_index: chunks.length\n      });\n    }\n  }\n}\n\n// Ensure at least one chunk\nif (chunks.length === 0) {\n  const fallbackText = pageData.length > 0 ? pageData[0].text : markdown;\n  chunks.push({\n    text: fallbackText.substring(0, MAX_CHUNK_SIZE) || 'Empty document',\n    page_num: 1,\n    document_id: documentId,\n    family_id: familyId,\n    document_title: title,\n    chunk_index: 0\n  });\n}\n\nconsole.log('Created', chunks.length, 'chunks');\nreturn chunks.map(c => ({ json: c }));"
+          "jsCode": "// Process hierarchical chunking response from Docling\n// Response has 'chunks' array with page_numbers field\nlet doclingResponse;\ntry {\n  const directCheck = $('Direct Result?');\n  if (directCheck && directCheck.first) {\n    const directItem = directCheck.first();\n    if (directItem && directItem.json) {\n      const directData = directItem.json;\n      if (directData.direct_result && directData.result) {\n        doclingResponse = directData.result;\n      }\n    }\n  }\n} catch (e) {\n  // Direct result not available, will use input\n}\nif (!doclingResponse) {\n  doclingResponse = $input.first().json;\n}\n\nconst extractNode = $('Extract Document Info').first().json;\nconst documentId = extractNode.document_id;\nconst familyId = extractNode.family_id;\nconst title = extractNode.title;\n\nconsole.log('Docling response keys:', Object.keys(doclingResponse));\n\n// Get chunks from hierarchical chunking response\nconst doclingChunks = doclingResponse.chunks || [];\nconsole.log('Received', doclingChunks.length, 'chunks from Docling');\n\nif (doclingChunks.length === 0) {\n  throw new Error('No chunks received from Docling. Response: ' + JSON.stringify(Object.keys(doclingResponse)));\n}\n\n// Convert Docling chunks to our format\nconst chunks = [];\nconst MIN_CHUNK_SIZE = 50;\n\nfor (let i = 0; i < doclingChunks.length; i++) {\n  const chunk = doclingChunks[i];\n  const text = chunk.text || chunk.raw_text || '';\n  \n  // Skip very small chunks\n  if (text.trim().length < MIN_CHUNK_SIZE) {\n    console.log('Skipping small chunk', i, ':', text.length, 'chars');\n    continue;\n  }\n  \n  // Get page number from page_numbers array (use first page if spans multiple)\n  const pageNumbers = chunk.page_numbers || [];\n  const pageNum = pageNumbers.length > 0 ? pageNumbers[0] : 1;\n  \n  chunks.push({\n    text: text.trim(),\n    page_num: pageNum,\n    document_id: documentId,\n    family_id: familyId,\n    document_title: title,\n    chunk_index: chunks.length,\n    // Include headings for context if available\n    headings: chunk.headings || []\n  });\n}\n\n// Ensure at least one chunk\nif (chunks.length === 0 && doclingChunks.length > 0) {\n  const firstChunk = doclingChunks[0];\n  chunks.push({\n    text: (firstChunk.text || firstChunk.raw_text || 'Empty document').trim(),\n    page_num: (firstChunk.page_numbers || [])[0] || 1,\n    document_id: documentId,\n    family_id: familyId,\n    document_title: title,\n    chunk_index: 0,\n    headings: firstChunk.headings || []\n  });\n}\n\nconsole.log('Created', chunks.length, 'chunks with page numbers');\n\n// Log page distribution\nconst pageStats = {};\nchunks.forEach(c => { pageStats[c.page_num] = (pageStats[c.page_num] || 0) + 1; });\nconsole.log('Page distribution:', JSON.stringify(pageStats));\n\nreturn chunks.map(c => ({ json: c }));"
         },
         "id": "code-chunk",
-        "name": "Chunk Markdown",
+        "name": "Process Docling Chunks",
         "type": "n8n-nodes-base.code",
         "typeVersion": 2,
         "position": [
@@ -386,7 +386,7 @@
       },
       {
         "parameters": {
-          "jsCode": "// Simple hash function for BM25 sparse vector generation\nfunction hashCode(str) {\n  let hash = 0;\n  for (let i = 0; i < str.length; i++) {\n    const char = str.charCodeAt(i);\n    hash = ((hash << 5) - hash) + char;\n    hash = hash & hash; // Convert to 32-bit integer\n  }\n  return Math.abs(hash);\n}\n\n// Get chunk data from previous node\nconst chunkData = $('Chunk Markdown').item.json;\nconst embedding = $json.embedding;\n\nif (!embedding || !Array.isArray(embedding)) {\n  throw new Error('Failed to get embedding from Ollama. Response: ' + JSON.stringify($json));\n}\n\n// Generate BM25-compatible sparse vector from the chunk text\nconst text = chunkData.text.toLowerCase();\nconst words = text.split(/\\W+/).filter(w => w.length > 2);\nconst wordCounts = {};\nwords.forEach(w => { wordCounts[w] = (wordCounts[w] || 0) + 1; });\n\n// Convert to sparse format: {indices: [], values: []}\nconst indices = [];\nconst values = [];\nObject.entries(wordCounts).forEach(([word, count]) => {\n  indices.push(hashCode(word) % 30000);  // Hash to fixed vocab size\n  values.push(count);\n});\n\n// Create integer point ID: document_id * 10000 + chunk_index\nconst pointId = parseInt(chunkData.document_id) * 10000 + chunkData.chunk_index;\n\nreturn { json: {\n  point_id: pointId,\n  dense_vector: embedding,\n  sparse_vector: { indices: indices, values: values },\n  payload: chunkData\n}};",
+          "jsCode": "// Simple hash function for BM25 sparse vector generation\nfunction hashCode(str) {\n  let hash = 0;\n  for (let i = 0; i < str.length; i++) {\n    const char = str.charCodeAt(i);\n    hash = ((hash << 5) - hash) + char;\n    hash = hash & hash; // Convert to 32-bit integer\n  }\n  return Math.abs(hash);\n}\n\n// Get chunk data from previous node\nconst chunkData = $('Process Docling Chunks').item.json;\nconst embedding = $json.embedding;\n\nif (!embedding || !Array.isArray(embedding)) {\n  throw new Error('Failed to get embedding from Ollama. Response: ' + JSON.stringify($json));\n}\n\n// Generate BM25-compatible sparse vector from the chunk text\nconst text = chunkData.text.toLowerCase();\nconst words = text.split(/\\W+/).filter(w => w.length > 2);\nconst wordCounts = {};\nwords.forEach(w => { wordCounts[w] = (wordCounts[w] || 0) + 1; });\n\n// Convert to sparse format: {indices: [], values: []}\nconst indices = [];\nconst values = [];\nObject.entries(wordCounts).forEach(([word, count]) => {\n  indices.push(hashCode(word) % 30000);  // Hash to fixed vocab size\n  values.push(count);\n});\n\n// Create integer point ID: document_id * 10000 + chunk_index\nconst pointId = parseInt(chunkData.document_id) * 10000 + chunkData.chunk_index;\n\nreturn { json: {\n  point_id: pointId,\n  dense_vector: embedding,\n  sparse_vector: { indices: indices, values: values },\n  payload: chunkData\n}};",
           "mode": "runOnceForEachItem"
         },
         "id": "code-prepare-qdrant",
@@ -523,14 +523,14 @@
         "main": [
           [
             {
-              "node": "Start Docling Conversion",
+              "node": "Start Docling Chunking",
               "type": "main",
               "index": 0
             }
           ]
         ]
       },
-      "Start Docling Conversion": {
+      "Start Docling Chunking": {
         "main": [
           [
             {
@@ -574,7 +574,7 @@
         "main": [
           [
             {
-              "node": "Chunk Markdown",
+              "node": "Process Docling Chunks",
               "type": "main",
               "index": 0
             }
@@ -618,7 +618,7 @@
         "main": [
           [
             {
-              "node": "Get Conversion Result",
+              "node": "Get Chunking Result",
               "type": "main",
               "index": 0
             }
@@ -632,18 +632,18 @@
           ]
         ]
       },
-      "Get Conversion Result": {
+      "Get Chunking Result": {
         "main": [
           [
             {
-              "node": "Chunk Markdown",
+              "node": "Process Docling Chunks",
               "type": "main",
               "index": 0
             }
           ]
         ]
       },
-      "Chunk Markdown": {
+      "Process Docling Chunks": {
         "main": [
           [
             {
