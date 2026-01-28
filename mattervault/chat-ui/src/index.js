@@ -4,6 +4,7 @@ const cookieParser = require('cookie-parser');
 const { createApiRouter } = require('./api');
 const authRoutes = require('./routes/auth');
 const conversationsRoutes = require('./routes/conversations');
+const { createDocumentsRouter } = require('./routes/documents');
 const { waitForDatabase, runMigrations } = require('./migrations');
 const { requireAuth } = require('./middleware/auth');
 
@@ -37,6 +38,9 @@ app.use('/api/auth', authRoutes);
 
 // Protected conversations routes
 app.use('/api/conversations', requireAuth, conversationsRoutes);
+
+// Protected documents routes (for PDF preview with family authorization)
+app.use('/api/documents', requireAuth, createDocumentsRouter(config));
 
 // Protected API routes
 app.use('/api', requireAuth, createApiRouter(config));

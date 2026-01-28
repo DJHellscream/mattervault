@@ -751,6 +751,39 @@ select:disabled {
   padding: 2px 8px;
   border-radius: 4px;
   margin-top: 4px;
+  transition: all 0.2s ease;
+}
+
+/* Clickable source citations */
+a.source-citation.clickable {
+  text-decoration: none;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+a.source-citation.clickable:hover {
+  background: rgba(0, 212, 170, 0.2);
+  border-color: rgba(0, 212, 170, 0.4);
+  color: #00e6b8;
+  text-decoration: underline;
+}
+
+a.source-citation.clickable:active {
+  background: rgba(0, 212, 170, 0.3);
+  transform: scale(0.98);
+}
+
+/* Document preview icon for clickable citations */
+a.source-citation.clickable::before {
+  content: '';
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-right: 4px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2300d4aa' stroke-width='2'%3E%3Cpath d='M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'/%3E%3Cpolyline points='14,2 14,8 20,8'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  vertical-align: middle;
 }
 
 /* Loading dots */

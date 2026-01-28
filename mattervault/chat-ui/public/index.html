@@ -791,11 +791,37 @@
         // Inline code
         .replace(/`([^`]+)`/g, '<code>$1</code>')
         // Line breaks
-        .replace(/\n/g, '<br>')
-        // Source citations - full format: (Source: filename, Page X)
-        .replace(/\(Source: ([^)]+)\)/g, '<span class="source-citation">(Source: $1)</span>')
-        // Source citations - numbered format: (Source X: Page Y)
-        .replace(/\(Source (\d+): ([^)]+)\)/g, '<span class="source-citation">(Source $1: $2)</span>');
+        .replace(/\n/g, '<br>');
+
+      // Make source citations clickable
+      // Format: (Source: filename.pdf, Page X) or (Source: filename.pdf (Page X))
+      // Extract document ID if embedded: [doc:123]filename.pdf
+      formatted = formatted.replace(
+        /\(Source: (?:\[doc:(\d+)\])?([^,)]+?)(?:,?\s*(?:\()?[Pp]age\s*(\d+)(?:\))?)?\)/g,
+        (match, docId, filename, page) => {
+          const displayText = page ? `${filename}, Page ${page}` : filename;
+          if (docId) {
+            // We have a document ID - make it clickable
+            return `<a href="#" class="source-citation clickable" onclick="previewDocument('${docId}', ${page || 1}); return false;" title="Click to view document">(Source: ${displayText})</a>`;
+          }
+          // No doc ID - just display as non-clickable citation
+          return `<span class="source-citation">(Source: ${displayText})</span>`;
+        }
+      );
+
+      // Handle numbered source format: (Source X: Page Y) or (Source X: filename, Page Y)
+      formatted = formatted.replace(
+        /\(Source (\d+): (?:\[doc:(\d+)\])?([^)]+)\)/g,
+        (match, sourceNum, docId, details) => {
+          if (docId) {
+            // Extract page number if present
+            const pageMatch = details.match(/[Pp]age\s*(\d+)/);
+            const page = pageMatch ? pageMatch[1] : 1;
+            return `<a href="#" class="source-citation clickable" onclick="previewDocument('${docId}', ${page}); return false;" title="Click to view document">(Source ${sourceNum}: ${details})</a>`;
+          }
+          return `<span class="source-citation">(Source ${sourceNum}: ${details})</span>`;
+        }
+      );
 
       return formatted;
     }
@@ -853,6 +879,53 @@
     // Utility
     function capitalizeFirst(str) {
       return str.charAt(0).toUpperCase() + str.slice(1);
+    }
+
+    /**
+     * Preview a document in a new tab
+     * @param {string} docId - The Paperless document ID
+     * @param {number} page - The page number to navigate to (optional, for future PDF.js integration)
+     */
+    function previewDocument(docId, page) {
+      if (!docId) {
+        console.warn('No document ID provided for preview');
+        return;
+      }
+
+      // Open PDF in new tab
+      // The page parameter is included for future enhancement with PDF.js viewer
+      const url = `/api/documents/${docId}/preview` + (page ? `#page=${page}` : '');
+      window.open(url, '_blank');
+    }
+
+    /**
+     * Parse citations from n8n response and extract document IDs
+     * This function can be extended when n8n starts returning structured citation data
+     * @param {Object} responseData - The response from the chat API
+     * @returns {Map} Map of citation text to document ID
+     */
+    function extractCitationDocIds(responseData) {
+      const citationMap = new Map();
+
+      // Check if structured citations are available
+      if (responseData.citations && Array.isArray(responseData.citations)) {
+        responseData.citations.forEach(citation => {
+          if (citation.document_id && citation.filename) {
+            citationMap.set(citation.filename, citation.document_id);
+          }
+        });
+      }
+
+      // Also check sources field (alternative format from n8n)
+      if (responseData.sources && Array.isArray(responseData.sources)) {
+        responseData.sources.forEach(source => {
+          if (source.document_id && source.title) {
+            citationMap.set(source.title, source.document_id);
+          }
+        });
+      }
+
+      return citationMap;
     }
 
     init();
