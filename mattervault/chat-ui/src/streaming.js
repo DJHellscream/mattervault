@@ -48,6 +48,11 @@ function createStreamingRouter(config) {
       return res.status(400).json({ error: 'family_id is required' });
     }
 
+    // Verify user has access to this family_id
+    if (req.user.family_id !== family_id) {
+      return res.status(403).json({ error: 'Access denied to this family' });
+    }
+
     // Set SSE headers
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
@@ -57,6 +62,16 @@ function createStreamingRouter(config) {
 
     let conversationId = conversation_id;
     let fullResponse = '';
+
+    // AbortController to cancel Ollama request if client disconnects
+    const abortController = new AbortController();
+    let clientDisconnected = false;
+
+    req.on('close', () => {
+      clientDisconnected = true;
+      abortController.abort();
+      console.log('Client disconnected, aborting Ollama request');
+    });
 
     try {
       // Step 1: Create or validate conversation
@@ -167,12 +182,14 @@ function createStreamingRouter(config) {
             temperature: 0.3,  // Lower temperature for more factual responses
             num_predict: 2048  // Max tokens
           }
-        })
+        }),
+        signal: abortController.signal
       });
 
       if (!ollamaResponse.ok) {
         const errorText = await ollamaResponse.text();
-        throw new Error(`Ollama error: ${ollamaResponse.status} - ${errorText}`);
+        console.error(`Ollama error: ${ollamaResponse.status} - ${errorText}`);
+        throw new Error('Failed to generate response. Please try again.');
       }
 
       // Ollama streams NDJSON (newline-delimited JSON)
@@ -182,6 +199,9 @@ function createStreamingRouter(config) {
       let buffer = '';
 
       while (true) {
+        // Check if client disconnected before reading more
+        if (clientDisconnected) break;
+
         const { done, value } = await reader.read();
         if (done) break;
 
@@ -259,15 +279,20 @@ function createStreamingRouter(config) {
       res.end();
 
     } catch (err) {
-      console.error('Streaming error:', err);
+      // Don't send error if client already disconnected
+      if (clientDisconnected || err.name === 'AbortError') {
+        console.log('Request aborted due to client disconnect');
+      } else {
+        console.error('Streaming error:', err);
 
-      // Send error to client
-      res.write(`data: ${JSON.stringify({
-        type: 'error',
-        error: err.message
-      })}\n\n`);
-      res.write('data: [DONE]\n\n');
-      res.end();
+        // Send error to client
+        res.write(`data: ${JSON.stringify({
+          type: 'error',
+          error: err.message
+        })}\n\n`);
+        res.write('data: [DONE]\n\n');
+        res.end();
+      }
 
       // If we had a partial response, still try to save it
       if (fullResponse && conversationId) {
@@ -290,9 +315,13 @@ function createStreamingRouter(config) {
    * Body: { question, family_id, conversation_id }
    */
   router.post('/stream', async (req, res) => {
-    // Redirect to GET handler with query params
+    // Merge body params into query so the handler can use them uniformly
     req.query = { ...req.query, ...req.body };
-    return router.handle(req, res, () => {});
+    // Delegate to the GET handler by re-routing
+    req.method = 'GET';
+    return router.handle(req, res, () => {
+      res.status(404).json({ error: 'Not found' });
+    });
   });
 
   return router;
