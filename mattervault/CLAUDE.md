@@ -406,6 +406,7 @@ curl -X POST http://localhost:5678/webhook/chat-api-v3 \
 
 | Workflow Name | ID | Local JSON File |
 |---------------|-----|-----------------|
+| Document Ingestion Pipeline | `EaWTlxVhTx2Fc7mg` | (legacy, no local file) |
 | Document Ingestion Pipeline V2 (Hybrid) | `ZIhqLsxBzrUam8bi` | `document-ingestion-v2.json` |
 | Mattervault Chat V4 (Simplified) | `wHoLnYdlFJoaHfDZ` | `mattervault-chat-v4-simplified.json` |
 
