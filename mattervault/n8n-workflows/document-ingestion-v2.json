@@ -192,7 +192,7 @@
               {
                 "parameterType": "formData",
                 "name": "options",
-                "value": "{\"do_ocr\": true, \"force_ocr\": false, \"ocr_lang\": \"en\"}"
+                "value": "{\"do_ocr\": true, \"force_ocr\": false, \"ocr_lang\": \"en\", \"table_mode\": \"accurate\", \"table_cell_matching\": true}"
               }
             ]
           },
