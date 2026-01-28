@@ -188,6 +188,119 @@
     .export-menu-item:hover svg {
       opacity: 1;
     }
+
+    /* Streaming indicator styles */
+    .streaming-cursor {
+      display: inline-block;
+      width: 2px;
+      height: 1em;
+      background: var(--accent-teal);
+      margin-left: 2px;
+      animation: blink 0.8s step-end infinite;
+      vertical-align: text-bottom;
+    }
+
+    @keyframes blink {
+      0%, 50% { opacity: 1; }
+      51%, 100% { opacity: 0; }
+    }
+
+    .streaming-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: rgba(0, 212, 170, 0.1);
+      border: 1px solid rgba(0, 212, 170, 0.2);
+      border-radius: 8px;
+      font-size: 0.85rem;
+      color: var(--accent-teal);
+      margin-bottom: 8px;
+    }
+
+    .streaming-status .status-icon {
+      width: 16px;
+      height: 16px;
+      border: 2px solid var(--accent-teal);
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    .message.streaming .message-content {
+      border-color: rgba(0, 212, 170, 0.3);
+      box-shadow: 0 0 20px rgba(0, 212, 170, 0.1);
+    }
+
+    /* Smooth text appearance during streaming */
+    .message.streaming .streamed-text {
+      animation: fadeInText 0.1s ease-out;
+    }
+
+    @keyframes fadeInText {
+      from { opacity: 0.7; }
+      to { opacity: 1; }
+    }
+
+    /* Toggle for streaming mode */
+    .streaming-toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .streaming-toggle:hover {
+      background: rgba(0, 0, 0, 0.3);
+      color: var(--text-primary);
+    }
+
+    .streaming-toggle.active {
+      background: rgba(0, 212, 170, 0.1);
+      border-color: rgba(0, 212, 170, 0.3);
+      color: var(--accent-teal);
+    }
+
+    .streaming-toggle input[type="checkbox"] {
+      display: none;
+    }
+
+    .streaming-toggle .toggle-indicator {
+      width: 32px;
+      height: 18px;
+      background: var(--bg-card);
+      border-radius: 9px;
+      position: relative;
+      transition: all 0.2s ease;
+    }
+
+    .streaming-toggle .toggle-indicator::after {
+      content: '';
+      position: absolute;
+      width: 14px;
+      height: 14px;
+      background: var(--text-muted);
+      border-radius: 50%;
+      top: 2px;
+      left: 2px;
+      transition: all 0.2s ease;
+    }
+
+    .streaming-toggle.active .toggle-indicator {
+      background: rgba(0, 212, 170, 0.3);
+    }
+
+    .streaming-toggle.active .toggle-indicator::after {
+      background: var(--accent-teal);
+      transform: translateX(14px);
+    }
   </style>
 </head>
 <body>
@@ -310,6 +423,11 @@
         <div class="input-area">
           <div class="input-wrapper">
             <input type="text" id="questionInput" placeholder="Type your question..." disabled>
+            <label class="streaming-toggle active" id="streamingToggle" title="Toggle streaming responses">
+              <input type="checkbox" id="streamingCheckbox" checked>
+              <span class="toggle-indicator"></span>
+              <span>Stream</span>
+            </label>
             <button id="sendBtn" disabled>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
@@ -374,6 +492,11 @@
     const exportBtn = document.getElementById('exportBtn');
     const exportMarkdown = document.getElementById('exportMarkdown');
     const exportPdf = document.getElementById('exportPdf');
+    const streamingToggle = document.getElementById('streamingToggle');
+    const streamingCheckbox = document.getElementById('streamingCheckbox');
+
+    // Streaming mode state
+    let useStreaming = true;
 
     // Initialize
     async function init() {
@@ -706,6 +829,13 @@
           exportDropdown.classList.remove('open');
         }
       });
+
+      // Streaming toggle
+      streamingToggle.addEventListener('click', () => {
+        useStreaming = !useStreaming;
+        streamingCheckbox.checked = useStreaming;
+        streamingToggle.classList.toggle('active', useStreaming);
+      });
     }
 
     // Toggle sidebar (desktop)
@@ -777,8 +907,16 @@
       }
     }
 
-    // Send message
+    // Send message - dispatches to streaming or non-streaming mode
     async function sendMessage() {
+      if (useStreaming) {
+        return sendStreamingMessage();
+      }
+      return sendNonStreamingMessage();
+    }
+
+    // Non-streaming message send (original implementation)
+    async function sendNonStreamingMessage() {
       const question = questionInput.value.trim();
       if (!question || !selectedFamily || isLoading) return;
 
@@ -832,6 +970,210 @@
         sendBtn.disabled = false;
         questionInput.focus();
       }
+    }
+
+    // Streaming message send using SSE
+    async function sendStreamingMessage() {
+      const question = questionInput.value.trim();
+      if (!question || !selectedFamily || isLoading) return;
+
+      // Add user message
+      addMessage('user', question);
+      questionInput.value = '';
+
+      // Show loading
+      isLoading = true;
+      sendBtn.disabled = true;
+
+      // Create streaming message placeholder
+      const messageId = createStreamingMessage();
+      const messageDiv = document.getElementById(messageId);
+      const contentDiv = messageDiv.querySelector('.message-content');
+      let fullText = '';
+      let statusDiv = null;
+
+      try {
+        // Build query parameters
+        const params = new URLSearchParams({
+          question: question,
+          family_id: selectedFamily.slug
+        });
+        if (currentConversationId) {
+          params.append('conversation_id', currentConversationId);
+        }
+
+        // Use fetch with ReadableStream for SSE (since EventSource doesn't support headers)
+        const response = await fetch(`/api/chat/stream?${params}`, {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Accept': 'text/event-stream'
+          }
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: 'Stream failed' }));
+          throw new Error(errorData.error || `HTTP ${response.status}`);
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+
+          // Parse SSE format: "data: {...}\n\n"
+          const lines = buffer.split('\n');
+          buffer = '';
+
+          for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+
+            // If this line doesn't end an SSE message, keep it in buffer
+            if (i === lines.length - 1 && line !== '') {
+              buffer = line;
+              continue;
+            }
+
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6);
+
+              if (data === '[DONE]') {
+                // Stream complete
+                break;
+              }
+
+              try {
+                const parsed = JSON.parse(data);
+
+                switch (parsed.type) {
+                  case 'conversation_id':
+                    // New conversation created
+                    if (!currentConversationId) {
+                      currentConversationId = parsed.conversation_id;
+                      updateExportVisibility();
+                      loadConversations(); // Refresh sidebar
+                    }
+                    break;
+
+                  case 'status':
+                    // Show status indicator
+                    if (!statusDiv) {
+                      statusDiv = document.createElement('div');
+                      statusDiv.className = 'streaming-status';
+                      statusDiv.innerHTML = `
+                        <div class="status-icon"></div>
+                        <span class="status-text">Searching documents...</span>
+                      `;
+                      contentDiv.innerHTML = '';
+                      contentDiv.appendChild(statusDiv);
+                    }
+                    const statusText = parsed.status === 'searching'
+                      ? 'Searching documents...'
+                      : parsed.status === 'generating'
+                        ? 'Generating response...'
+                        : parsed.status;
+                    statusDiv.querySelector('.status-text').textContent = statusText;
+                    break;
+
+                  case 'token':
+                    // Remove status indicator on first token
+                    if (statusDiv) {
+                      statusDiv.remove();
+                      statusDiv = null;
+                      contentDiv.innerHTML = '';
+                    }
+
+                    // Append token to content
+                    const token = parsed.content || '';
+                    if (token) {
+                      fullText += token;
+                      // Update content with cursor
+                      contentDiv.innerHTML = formatMessage(fullText) + '<span class="streaming-cursor"></span>';
+                      // Scroll to bottom
+                      messages.scrollTop = messages.scrollHeight;
+                    }
+                    break;
+
+                  case 'complete':
+                    // Finalize message
+                    if (parsed.conversation_id && !currentConversationId) {
+                      currentConversationId = parsed.conversation_id;
+                      updateExportVisibility();
+                    }
+                    break;
+
+                  case 'error':
+                    throw new Error(parsed.error);
+                }
+              } catch (parseErr) {
+                if (parseErr.message !== 'Unexpected end of JSON input') {
+                  console.error('Parse error:', parseErr, 'Data:', data);
+                }
+              }
+            }
+          }
+        }
+
+        // Finalize message display
+        messageDiv.classList.remove('streaming');
+        contentDiv.innerHTML = formatMessage(fullText);
+        messageDiv.dataset.rawContent = deduplicateSources(fullText);
+
+        // Refresh conversations list
+        await loadConversations();
+
+      } catch (err) {
+        console.error('Streaming error:', err);
+
+        // Remove the streaming message if it has no content
+        if (!fullText) {
+          removeMessage(messageId);
+          addMessage('error', `Streaming failed: ${err.message}`);
+        } else {
+          // Keep partial content but mark as interrupted
+          messageDiv.classList.remove('streaming');
+          contentDiv.innerHTML = formatMessage(fullText + '\n\n[Response interrupted]');
+        }
+      } finally {
+        isLoading = false;
+        sendBtn.disabled = false;
+        questionInput.focus();
+      }
+    }
+
+    // Create a streaming message placeholder
+    function createStreamingMessage() {
+      const id = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+      const div = document.createElement('div');
+      div.id = id;
+      div.className = 'message assistant streaming';
+      div.innerHTML = `
+        <div class="message-header">
+          <div class="message-label">Mattervault</div>
+          <button class="copy-btn" onclick="copyMessage(this)" title="Copy to clipboard">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+          </button>
+        </div>
+        <div class="message-content">
+          <div class="streaming-status">
+            <div class="status-icon"></div>
+            <span class="status-text">Connecting...</span>
+          </div>
+        </div>
+      `;
+      div.dataset.rawContent = '';
+
+      messages.appendChild(div);
+      messages.scrollTop = messages.scrollHeight;
+
+      return id;
     }
 
     // Add message to chat

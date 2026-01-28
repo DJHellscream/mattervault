@@ -2,6 +2,7 @@ const express = require('express');
 const path = require('path');
 const cookieParser = require('cookie-parser');
 const { createApiRouter } = require('./api');
+const { createStreamingRouter } = require('./streaming');
 const authRoutes = require('./routes/auth');
 const conversationsRoutes = require('./routes/conversations');
 const { createDocumentsRouter } = require('./routes/documents');
@@ -41,6 +42,9 @@ app.use('/api/conversations', requireAuth, conversationsRoutes);
 
 // Protected documents routes (for PDF preview with family authorization)
 app.use('/api/documents', requireAuth, createDocumentsRouter(config));
+
+// Protected streaming routes (SSE for chat)
+app.use('/api/chat', requireAuth, createStreamingRouter(config));
 
 // Protected API routes
 app.use('/api', requireAuth, createApiRouter(config));

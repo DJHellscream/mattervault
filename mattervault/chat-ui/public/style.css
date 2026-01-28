@@ -893,6 +893,107 @@ a.source-citation.clickable::before {
   margin-top: 10px;
 }
 
+/* Streaming toggle in input wrapper */
+.input-wrapper .streaming-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.input-wrapper .streaming-toggle:hover {
+  background: rgba(0, 0, 0, 0.2);
+  color: var(--text-secondary);
+}
+
+.input-wrapper .streaming-toggle.active {
+  color: var(--accent-teal);
+}
+
+.input-wrapper .streaming-toggle .toggle-indicator {
+  width: 28px;
+  height: 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.input-wrapper .streaming-toggle .toggle-indicator::after {
+  content: '';
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background: var(--text-muted);
+  border-radius: 50%;
+  top: 1px;
+  left: 1px;
+  transition: all 0.2s ease;
+}
+
+.input-wrapper .streaming-toggle.active .toggle-indicator {
+  background: rgba(0, 212, 170, 0.2);
+  border-color: rgba(0, 212, 170, 0.4);
+}
+
+.input-wrapper .streaming-toggle.active .toggle-indicator::after {
+  background: var(--accent-teal);
+  transform: translateX(12px);
+}
+
+/* Streaming cursor animation */
+.streaming-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1.1em;
+  background: var(--accent-teal);
+  margin-left: 2px;
+  animation: cursorBlink 0.8s step-end infinite;
+  vertical-align: text-bottom;
+}
+
+@keyframes cursorBlink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+/* Streaming status indicator */
+.streaming-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: rgba(0, 212, 170, 0.08);
+  border: 1px solid rgba(0, 212, 170, 0.15);
+  border-radius: 10px;
+  font-size: 0.9rem;
+  color: var(--accent-teal);
+}
+
+.streaming-status .status-icon {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--accent-teal);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+/* Streaming message style */
+.message.streaming .message-content {
+  border-color: rgba(0, 212, 170, 0.25);
+  box-shadow: 0 0 30px rgba(0, 212, 170, 0.08);
+}
+
 /* Export dropdown styles */
 .export-dropdown {
   position: relative;
