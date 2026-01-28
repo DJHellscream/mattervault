@@ -166,7 +166,8 @@ services:
       - matternet
 
   n8n:
-    image: n8nio/n8n:2.4.4
+    build: ./n8n
+    image: mattervault-n8n:latest
     container_name: matterlogic
     restart: always
     ports:
@@ -188,6 +189,7 @@ services:
       N8N_BASIC_AUTH_PASSWORD: ${N8N_AUTH_PASS:-Mattervault2025}
       N8N_RUNNERS_DISABLED: false
       N8N_PUBLIC_API_ENABLED: "true"
+      # Note: Ollama model config is now in the workflow's Config node, not env vars
     volumes:
       - n8n_data:/home/node/.n8n
       - D:\CCC\mattervault\intake:/files/intake:ro  # Triggers
@@ -235,6 +237,11 @@ services:
       - CHATUI_DB_PASS=${CHATUI_DB_PASS:-chatui_secure_pass}
       - REDIS_URL=redis://mattercache:6379/1
       - JWT_SECRET=${JWT_SECRET:-dev_jwt_secret_change_in_production}
+      # Ollama configuration for streaming responses
+      - OLLAMA_URL=http://host.docker.internal:11434
+      - OLLAMA_MODEL=${OLLAMA_CHAT_MODEL:-llama3.1:8b}
+      # Conversation context (sliding window)
+      - CHAT_HISTORY_LIMIT=${CHAT_HISTORY_LIMIT:-10}
     depends_on:
       - paperless
       - qdrant
