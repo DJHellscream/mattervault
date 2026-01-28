@@ -1,0 +1,261 @@
+# ==============================================================================
+# MATTERVAULT FINAL STACK (n8n Edition — Native Acceleration)
+# ------------------------------------------------------------------------------
+# CORE: Paperless (Vault) + n8n (Brain/Agents) + Qdrant (Memory)
+# EXTERNAL (Native Host for GPU/Metal):
+# - Ollama:  $env:OLLAMA_HOST="0.0.0.0"; ollama serve
+# - Docling: docling-serve --host 0.0.0.0 --port 5001 --no-ui
+# FEATURES:
+# - Shared ./intake folder (attorney drop-offs → auto-process)
+# - n8n basic auth
+# - Qdrant snapshots + gRPC
+# - Paperless watched folder polling
+# USAGE: docker compose up -d
+# ACCESS:
+# - Paperless: http://localhost:8000 (admin / mattervault2025 from .env)
+# - n8n: http://localhost:5678 (admin / mattervault2025 from .env)
+# - Qdrant Dashboard: http://localhost:6333/dashboard
+# - Chat UI: http://localhost:3007
+# ==============================================================================
+name: mattervault
+services:
+  # ----------------------------------------------------------------------------
+  # ZONE 1: THE VAULT (Paperless-ngx + Helpers)
+  # ----------------------------------------------------------------------------
+  redis:
+    image: docker.io/redis:7.4.2
+    container_name: mattercache
+    restart: always
+    volumes:
+      - redisdata:/data
+    networks:
+      - matternet
+
+  db-paperless:
+    image: postgres:17.2
+    container_name: matterdb-paperless
+    restart: always
+    environment:
+      POSTGRES_DB: paperless
+      POSTGRES_USER: paperless
+      POSTGRES_PASSWORD: ${PAPERLESS_DB_PASS:-paperless_secure_pass}
+    volumes:
+      - pgdata_paperless:/var/lib/postgresql/data
+    networks:
+      - matternet
+
+  gotenberg:
+    image: gotenberg/gotenberg:8.25.1
+    container_name: matterconvert
+    restart: always
+    command:
+      - "gotenberg"
+      - "--chromium-disable-javascript=true"
+      - "--chromium-allow-list=file:///tmp/.*"
+      - "--api-timeout=300s"
+    networks:
+      - matternet
+
+  tika:
+    image: apache/tika:3.2.3.0
+    container_name: matterparse
+    restart: always
+    networks:
+      - matternet
+
+  paperless:
+    image: ghcr.io/paperless-ngx/paperless-ngx:2.20.5
+    container_name: mattervault
+    restart: always
+    depends_on:
+      - redis
+      - db-paperless
+      - gotenberg
+      - tika
+    ports:
+      - "8000:8000"
+    environment:
+        # CORE
+        PAPERLESS_REDIS: redis://mattercache:6379
+        PAPERLESS_DBHOST: db-paperless
+        PAPERLESS_DBNAME: paperless
+        PAPERLESS_DBUSER: paperless
+        PAPERLESS_DBPASS: ${PAPERLESS_DB_PASS:-paperless_secure_pass}
+        PAPERLESS_TIME_ZONE: America/Indiana/Indianapolis
+        PAPERLESS_SECRET_KEY: ${PAPERLESS_SECRET:-super-secure-random-key}
+        PAPERLESS_URL: http://localhost:8000
+        PAPERLESS_TIKA_ENABLED: 1
+        PAPERLESS_TIKA_GOTENBERG_ENDPOINT: http://matterconvert:3000
+        PAPERLESS_TIKA_ENDPOINT: http://matterparse:9998
+        # ADMIN (Try to auto-create, but use CLI if this fails)
+        PAPERLESS_ADMIN_USER: admin
+        PAPERLESS_ADMIN_PASSWORD: ${PAPERLESS_ADMIN_PASS:-mattervault2025}
+
+        # ========================================================================
+        # CONSUMPTION / INGESTION (For ./intake drop folder automation)
+        # ========================================================================
+        PAPERLESS_CONSUMER_POLLING: 10                                          # Poll every 10s
+        PAPERLESS_CONSUMER_RECURSIVE: "true"                                    # Watch subfolders
+        PAPERLESS_CONSUMER_SUBDIRS_AS_TAGS: "true"                              # Auto-tag by family subfolder (e.g., intake/morrison/ → tag:morrison)
+
+        # ========================================================================
+        # OCR SETTINGS (Optimized for legal/estate docs — high quality & archival)
+        # ========================================================================
+        PAPERLESS_OCR_LANGUAGE: eng+fra                                         # English (add +fra etc. if needed)
+        PAPERLESS_OCR_MODE: skip                                                # Safest/fastest (OCR only when needed)
+        PAPERLESS_OCR_CLEAN: clean-final                                        # Best quality cleaning
+        PAPERLESS_OCR_DESKEW: "true"                                            # Fix skewed scans
+        PAPERLESS_OCR_ROTATE_PAGES: "true"                                      # Auto-rotate
+        PAPERLESS_OCR_ROTATE_PAGES_THRESHOLD: "12"                              # Conservative
+        PAPERLESS_OCR_OUTPUT_TYPE: pdfa-2                                       # Best archival standard (preserves color)
+        PAPERLESS_OCR_COLOR_CONVERSION_STRATEGY: RGB                            # Keep colors/highlights
+        PAPERLESS_TASKS_CREATE_ARCHIVED_DOCUMENT: "true"                        # Always create searchable PDF/A archived version
+
+        # ========================================================================
+        # OPTIONAL PERFORMANCE / FILENAME
+        # ========================================================================
+        # PAPERLESS_FILENAME_FORMAT: "{correspondent}/{title}_{created}"        # Organized filing (customize as needed)
+        PAPERLESS_WEBSERVER_WORKERS: 4                                          # Adjust for your CPU (parallel requests)
+        PAPERLESS_TASK_WORKERS: 4                                               # Parallel OCR/consumption
+        PAPERLESS_THREADS_PER_WORKER: 2
+        PAPERLESS_CONSUMER_IGNORE_PATTERNS: '[".DS_Store", "*.DS_Store"]'       # Ignore macOS junk files
+    # NOTE: Volume paths are absolute to allow management from within Claude's container environment.
+    # On a new machine, update "D:\CCC\mattervault" below to match your project location.
+    volumes:
+      - D:\CCC\mattervault\paperless\data:/usr/src/paperless/data
+      - D:\CCC\mattervault\paperless\media:/usr/src/paperless/media
+      - D:\CCC\mattervault\paperless\export:/usr/src/paperless/export
+      - D:\CCC\mattervault\paperless\consume:/usr/src/paperless/consume
+      # THE CLIENT'S INBOX - Family subfolders for multi-tenancy
+      # Example: ./intake/morrison/, ./intake/johnson/
+      # Subfolders become tags via PAPERLESS_CONSUMER_SUBDIRS_AS_TAGS
+      - D:\CCC\mattervault\intake:/usr/src/paperless/consume/intake  # Attorney drop-off folder
+    networks:
+      - matternet
+
+  # ----------------------------------------------------------------------------
+  # ZONE 2: THE MEMORY (Qdrant)
+  # ----------------------------------------------------------------------------
+  qdrant:
+    image: qdrant/qdrant:v1.16.2
+    container_name: mattermemory
+    restart: always
+    ports:
+      - "6333:6333"
+      - "6334:6334"  # gRPC for advanced n8n agents
+    volumes:
+      - qdrant_data:/qdrant/storage
+      - qdrant_snapshots:/qdrant/snapshots
+    networks:
+      - matternet
+
+  # ----------------------------------------------------------------------------
+  # ZONE 3: THE BRAIN (n8n + History DB)
+  # ----------------------------------------------------------------------------
+  db-n8n:
+    image: postgres:17.2
+    container_name: matterdb-n8n
+    restart: always
+    environment:
+      POSTGRES_DB: n8n
+      POSTGRES_USER: n8n
+      POSTGRES_PASSWORD: ${N8N_DB_PASS:-n8n_secure_pass}
+    volumes:
+      - pgdata_n8n:/var/lib/postgresql/data
+    networks:
+      - matternet
+
+  n8n:
+    image: n8nio/n8n:2.4.4
+    container_name: matterlogic
+    restart: always
+    ports:
+      - "5678:5678"
+    environment:
+      N8N_HOST: localhost
+      N8N_PORT: 5678
+      N8N_PROTOCOL: http
+      WEBHOOK_URL: http://localhost:5678/
+      GENERIC_TIMEZONE: America/Indiana/Indianapolis
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: matterdb-n8n
+      DB_POSTGRESDB_DATABASE: n8n
+      DB_POSTGRESDB_USER: n8n
+      DB_POSTGRESDB_PASSWORD: ${N8N_DB_PASS:-n8n_secure_pass}
+      N8N_AI_ENABLED: "true"
+      N8N_BASIC_AUTH_ACTIVE: true
+      N8N_BASIC_AUTH_USER: admin
+      N8N_BASIC_AUTH_PASSWORD: ${N8N_AUTH_PASS:-Mattervault2025}
+      N8N_RUNNERS_DISABLED: false
+      N8N_PUBLIC_API_ENABLED: "true"
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - D:\CCC\mattervault\intake:/files/intake:ro  # Triggers
+      - D:\CCC\mattervault\paperless\consume:/files/paperless-consume  # Push files if needed
+    depends_on:
+      - db-n8n
+      - qdrant
+    networks:
+      - matternet
+    extra_hosts:
+      - "host.docker.internal:host-gateway"  # Ollama + Docling native
+
+  # ----------------------------------------------------------------------------
+  # ZONE 4: THE INTERFACE (Chat UI)
+  # ----------------------------------------------------------------------------
+  db-chatui:
+    image: postgres:17.2
+    container_name: matterdb-chatui
+    restart: always
+    environment:
+      POSTGRES_DB: chatui
+      POSTGRES_USER: chatui
+      POSTGRES_PASSWORD: ${CHATUI_DB_PASS:-chatui_secure_pass}
+    volumes:
+      - pgdata_chatui:/var/lib/postgresql/data
+    networks:
+      - matternet
+
+  chat-ui:
+    build: ./chat-ui
+    container_name: mattervault-chat
+    restart: always
+    ports:
+      - "3007:3000"
+    environment:
+      - PAPERLESS_URL=http://mattervault:8000
+      - PAPERLESS_USER=admin
+      - PAPERLESS_PASS=${PAPERLESS_ADMIN_PASS:-mattervault2025}
+      - QDRANT_URL=http://mattermemory:6333
+      - N8N_WEBHOOK_URL=http://matterlogic:5678/webhook/chat-api-v3
+      - CHATUI_DB_HOST=matterdb-chatui
+      - CHATUI_DB_PORT=5432
+      - CHATUI_DB_NAME=chatui
+      - CHATUI_DB_USER=chatui
+      - CHATUI_DB_PASS=${CHATUI_DB_PASS:-chatui_secure_pass}
+      - REDIS_URL=redis://mattercache:6379/1
+      - JWT_SECRET=${JWT_SECRET:-dev_jwt_secret_change_in_production}
+    depends_on:
+      - paperless
+      - qdrant
+      - n8n
+      - db-chatui
+      - redis
+    networks:
+      - matternet
+
+# ------------------------------------------------------------------------------
+# NETWORKS & VOLUMES
+# ------------------------------------------------------------------------------
+networks:
+  matternet:
+    driver: bridge
+
+volumes:
+  redisdata:
+  pgdata_paperless:
+  pgdata_n8n:
+  pgdata_chatui:
+  n8n_data:
+  qdrant_data:
+  qdrant_snapshots:

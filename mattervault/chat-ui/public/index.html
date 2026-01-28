@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>mattervault chat</title>
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    /* User menu styles */
+    .user-menu {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .user-info {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+    }
+
+    .user-avatar {
+      width: 28px;
+      height: 28px;
+      background: var(--accent-teal);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      font-size: 0.85rem;
+      color: var(--bg-deep);
+    }
+
+    .user-name {
+      font-size: 0.9rem;
+      color: var(--text-primary);
+      font-weight: 500;
+    }
+
+    .user-family {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .logout-btn {
+      background: rgba(255, 92, 114, 0.1);
+      border: 1px solid rgba(255, 92, 114, 0.2);
+      border-radius: 8px;
+      padding: 8px 12px;
+      cursor: pointer;
+      color: var(--accent-error);
+      font-family: 'Outfit', sans-serif;
+      font-size: 0.85rem;
+      font-weight: 500;
+      transition: all 0.2s ease;
+    }
+
+    .logout-btn:hover {
+      background: rgba(255, 92, 114, 0.2);
+      border-color: rgba(255, 92, 114, 0.4);
+    }
+
+    /* Loading overlay for auth check */
+    .auth-loading {
+      position: fixed;
+      inset: 0;
+      background: var(--bg-deep);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .auth-loading.hidden {
+      display: none;
+    }
+
+    .auth-loading-content {
+      text-align: center;
+    }
+
+    .auth-loading-spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid var(--border-subtle);
+      border-top-color: var(--accent-teal);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 16px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .auth-loading-text {
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+    }
+  </style>
+</head>
+<body>
+  <!-- Auth loading overlay -->
+  <div class="auth-loading" id="authLoading">
+    <div class="auth-loading-content">
+      <div class="auth-loading-spinner"></div>
+      <div class="auth-loading-text">Loading...</div>
+    </div>
+  </div>
+
+  <div class="container">
+    <header>
+      <div class="brand">
+        <span class="brand-label">Document Intelligence</span>
+        <h1>mattervault</h1>
+      </div>
+      <div class="header-controls">
+        <div class="family-selector">
+          <select id="familySelect" disabled>
+            <option value="">Loading families...</option>
+          </select>
+          <span class="doc-count" id="docCount" style="display: none;"></span>
+        </div>
+        <div class="user-menu" id="userMenu">
+          <div class="user-info">
+            <div class="user-avatar" id="userAvatar">?</div>
+            <div>
+              <div class="user-name" id="userName">User</div>
+              <div class="user-family" id="userFamily"></div>
+            </div>
+          </div>
+          <button class="logout-btn" id="logoutBtn">Logout</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="chat-container">
+      <div class="messages" id="messages">
+        <div class="welcome-message">
+          <div class="welcome-icon">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            </svg>
+          </div>
+          <h2>Welcome to Mattervault</h2>
+          <p>Select a family above to start asking questions about their documents.</p>
+        </div>
+      </div>
+
+      <div class="input-area">
+        <div class="input-wrapper">
+          <input type="text" id="questionInput" placeholder="Type your question..." disabled>
+          <button id="sendBtn" disabled>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+            </svg>
+          </button>
+        </div>
+        <div class="input-hint" id="inputHint">Select a family to start chatting</div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    // Auth state
+    let accessToken = sessionStorage.getItem('accessToken');
+    let currentUser = null;
+
+    // State
+    let families = [];
+    let selectedFamily = null;
+    let sessionId = `chat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    let isLoading = false;
+
+    // DOM elements
+    const authLoading = document.getElementById('authLoading');
+    const familySelect = document.getElementById('familySelect');
+    const docCount = document.getElementById('docCount');
+    const messages = document.getElementById('messages');
+    const questionInput = document.getElementById('questionInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const inputHint = document.getElementById('inputHint');
+    const userMenu = document.getElementById('userMenu');
+    const userAvatar = document.getElementById('userAvatar');
+    const userName = document.getElementById('userName');
+    const userFamily = document.getElementById('userFamily');
+    const logoutBtn = document.getElementById('logoutBtn');
+
+    // Initialize
+    async function init() {
+      // Check authentication
+      const isAuthenticated = await checkAuth();
+      if (!isAuthenticated) {
+        window.location.href = '/login.html';
+        return;
+      }
+
+      // Hide loading overlay
+      authLoading.classList.add('hidden');
+
+      // Update user display
+      updateUserDisplay();
+
+      // Load families and setup
+      await loadFamilies();
+      setupEventListeners();
+    }
+
+    // Check if user is authenticated
+    async function checkAuth() {
+      if (!accessToken) {
+        return false;
+      }
+
+      try {
+        // Try to get current user info
+        const res = await fetch('/api/auth/me', {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`
+          }
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          currentUser = data.user;
+          sessionStorage.setItem('user', JSON.stringify(currentUser));
+          return true;
+        }
+
+        // Token might be expired, try to refresh
+        if (res.status === 401) {
+          return await refreshToken();
+        }
+
+        return false;
+      } catch (err) {
+        console.error('Auth check failed:', err);
+        return false;
+      }
+    }
+
+    // Refresh access token
+    async function refreshToken() {
+      try {
+        const res = await fetch('/api/auth/refresh', {
+          method: 'POST',
+          credentials: 'include'
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          accessToken = data.accessToken;
+          currentUser = data.user;
+          sessionStorage.setItem('accessToken', accessToken);
+          sessionStorage.setItem('user', JSON.stringify(currentUser));
+          return true;
+        }
+
+        // Refresh failed, clear storage
+        sessionStorage.removeItem('accessToken');
+        sessionStorage.removeItem('user');
+        return false;
+      } catch (err) {
+        console.error('Token refresh failed:', err);
+        return false;
+      }
+    }
+
+    // Make authenticated API request
+    async function authFetch(url, options = {}) {
+      const headers = {
+        ...options.headers,
+        'Authorization': `Bearer ${accessToken}`
+      };
+
+      let res = await fetch(url, { ...options, headers });
+
+      // If unauthorized, try to refresh token
+      if (res.status === 401) {
+        const refreshed = await refreshToken();
+        if (refreshed) {
+          headers['Authorization'] = `Bearer ${accessToken}`;
+          res = await fetch(url, { ...options, headers });
+        } else {
+          window.location.href = '/login.html';
+          throw new Error('Session expired');
+        }
+      }
+
+      return res;
+    }
+
+    // Update user display in header
+    function updateUserDisplay() {
+      if (currentUser) {
+        const displayName = currentUser.displayName || currentUser.email.split('@')[0];
+        userName.textContent = displayName;
+        userAvatar.textContent = displayName.charAt(0).toUpperCase();
+        userFamily.textContent = capitalizeFirst(currentUser.familyId);
+      }
+    }
+
+    // Load families from API
+    async function loadFamilies() {
+      try {
+        const res = await authFetch('/api/families');
+        families = await res.json();
+
+        familySelect.innerHTML = '<option value="">Select a family...</option>';
+        families.forEach(family => {
+          const option = document.createElement('option');
+          option.value = family.slug;
+          option.textContent = capitalizeFirst(family.name);
+          familySelect.appendChild(option);
+        });
+
+        familySelect.disabled = false;
+
+        // If user has a family_id, pre-select it
+        if (currentUser && currentUser.familyId) {
+          const userFamilyOption = families.find(f => f.slug === currentUser.familyId);
+          if (userFamilyOption) {
+            familySelect.value = currentUser.familyId;
+            onFamilyChange();
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load families:', err);
+        familySelect.innerHTML = '<option value="">Error loading families</option>';
+      }
+    }
+
+    // Setup event listeners
+    function setupEventListeners() {
+      familySelect.addEventListener('change', onFamilyChange);
+      sendBtn.addEventListener('click', sendMessage);
+      questionInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          sendMessage();
+        }
+      });
+      logoutBtn.addEventListener('click', logout);
+    }
+
+    // Handle logout
+    async function logout() {
+      try {
+        await fetch('/api/auth/logout', {
+          method: 'POST',
+          credentials: 'include'
+        });
+      } catch (err) {
+        console.error('Logout error:', err);
+      }
+
+      // Clear storage and redirect
+      sessionStorage.removeItem('accessToken');
+      sessionStorage.removeItem('user');
+      window.location.href = '/login.html';
+    }
+
+    // Handle family selection
+    function onFamilyChange() {
+      const slug = familySelect.value;
+
+      if (!slug) {
+        selectedFamily = null;
+        docCount.textContent = '';
+        docCount.style.display = 'none';
+        questionInput.disabled = true;
+        sendBtn.disabled = true;
+        inputHint.textContent = 'Select a family to start chatting';
+        return;
+      }
+
+      selectedFamily = families.find(f => f.slug === slug);
+      const docLabel = selectedFamily.paperless_docs === 1 ? 'document' : 'documents';
+      docCount.textContent = `${selectedFamily.paperless_docs} ${docLabel}`;
+      docCount.style.display = '';
+      questionInput.disabled = false;
+      sendBtn.disabled = false;
+      inputHint.textContent = `Asking about ${capitalizeFirst(selectedFamily.name)} family documents`;
+      questionInput.focus();
+
+      // Clear welcome message if present
+      const welcome = messages.querySelector('.welcome-message');
+      if (welcome) {
+        welcome.remove();
+      }
+
+      // Add system message
+      addMessage('system', `Now chatting about ${capitalizeFirst(selectedFamily.name)} family (${selectedFamily.paperless_docs} ${docLabel}, ${selectedFamily.indexed_docs} chunks indexed).`);
+    }
+
+    // Send message
+    async function sendMessage() {
+      const question = questionInput.value.trim();
+      if (!question || !selectedFamily || isLoading) return;
+
+      // Add user message
+      addMessage('user', question);
+      questionInput.value = '';
+
+      // Show loading
+      isLoading = true;
+      sendBtn.disabled = true;
+      const loadingId = addMessage('assistant', '', true);
+
+      try {
+        const res = await authFetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            family_id: selectedFamily.slug,
+            question: question,
+            session_id: sessionId
+          })
+        });
+
+        const data = await res.json();
+
+        // Remove loading indicator
+        removeMessage(loadingId);
+
+        if (res.ok) {
+          // Handle the response - could be text or structured
+          const answer = data.text || data.output || data.answer || data.response || JSON.stringify(data);
+          addMessage('assistant', answer);
+        } else {
+          addMessage('error', data.error || 'Failed to get response');
+        }
+      } catch (err) {
+        removeMessage(loadingId);
+        addMessage('error', `Request failed: ${err.message}`);
+      } finally {
+        isLoading = false;
+        sendBtn.disabled = false;
+        questionInput.focus();
+      }
+    }
+
+    // Add message to chat
+    function addMessage(type, content, isLoading = false) {
+      const id = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+      const div = document.createElement('div');
+      div.id = id;
+      div.className = `message ${type}`;
+
+      if (isLoading) {
+        div.innerHTML = `
+          <div class="message-content">
+            <div class="loading-dots">
+              <span></span><span></span><span></span>
+            </div>
+          </div>
+        `;
+      } else {
+        const label = type === 'user' ? 'You' : type === 'assistant' ? 'Mattervault' : type === 'system' ? 'System' : 'Error';
+        const showCopy = type === 'user' || type === 'assistant';
+        div.innerHTML = `
+          <div class="message-header">
+            <div class="message-label">${label}</div>
+            ${showCopy ? `
+              <button class="copy-btn" onclick="copyMessage(this)" title="Copy to clipboard">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+              </button>
+            ` : ''}
+          </div>
+          <div class="message-content">${formatMessage(content)}</div>
+        `;
+        // Store deduplicated content for copying
+        div.dataset.rawContent = deduplicateSources(content);
+      }
+
+      messages.appendChild(div);
+      messages.scrollTop = messages.scrollHeight;
+
+      return id;
+    }
+
+    // Copy message content
+    function copyMessage(btn) {
+      const messageDiv = btn.closest('.message');
+      const rawContent = messageDiv.dataset.rawContent || messageDiv.querySelector('.message-content').textContent;
+
+      navigator.clipboard.writeText(rawContent).then(() => {
+        // Show success feedback
+        btn.classList.add('copied');
+        btn.innerHTML = `
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+        `;
+        setTimeout(() => {
+          btn.classList.remove('copied');
+          btn.innerHTML = `
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+          `;
+        }, 2000);
+      });
+    }
+
+    // Remove message
+    function removeMessage(id) {
+      const msg = document.getElementById(id);
+      if (msg) msg.remove();
+    }
+
+    // Format message content (basic markdown-like formatting)
+    function formatMessage(text) {
+      if (!text) return '';
+
+      // Deduplicate sources in "Sources consulted" section
+      text = deduplicateSources(text);
+
+      // Escape HTML
+      let formatted = text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+
+      // Convert markdown-like syntax
+      formatted = formatted
+        // Bold
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        // Code blocks
+        .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
+        // Inline code
+        .replace(/`([^`]+)`/g, '<code>$1</code>')
+        // Line breaks
+        .replace(/\n/g, '<br>')
+        // Source citations - full format: (Source: filename, Page X)
+        .replace(/\(Source: ([^)]+)\)/g, '<span class="source-citation">(Source: $1)</span>')
+        // Source citations - numbered format: (Source X: Page Y)
+        .replace(/\(Source (\d+): ([^)]+)\)/g, '<span class="source-citation">(Source $1: $2)</span>');
+
+      return formatted;
+    }
+
+    // Deduplicate sources in the Sources consulted section
+    function deduplicateSources(text) {
+      // Find "Sources consulted:" section and dedupe the list
+      const sourcesMatch = text.match(/(Sources consulted:[\s\S]*?)(?=\n\n|$)/i);
+      if (!sourcesMatch) return text;
+
+      const sourcesSection = sourcesMatch[1];
+      const lines = sourcesSection.split('\n');
+      const header = lines[0];
+      const sourceLines = lines.slice(1);
+
+      // Extract unique sources by normalizing the content
+      const seen = new Set();
+      const uniqueLines = sourceLines.filter(line => {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed === '-') return false;
+        // Normalize: remove leading "- " and whitespace for comparison
+        const normalized = trimmed.replace(/^-\s*/, '').trim();
+        if (seen.has(normalized)) return false;
+        seen.add(normalized);
+        return true;
+      });
+
+      const newSection = header + '\n' + uniqueLines.join('\n');
+      return text.replace(sourcesSection, newSection);
+    }
+
+    // Utility
+    function capitalizeFirst(str) {
+      return str.charAt(0).toUpperCase() + str.slice(1);
+    }
+
+    init();
+  </script>
+</body>
+</html>

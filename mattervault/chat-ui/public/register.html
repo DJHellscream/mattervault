@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Register - Mattervault</title>
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    .auth-container {
+      position: relative;
+      z-index: 1;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .auth-card {
+      background: var(--bg-surface);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--border-subtle);
+      border-radius: 24px;
+      padding: 48px 40px;
+      width: 100%;
+      max-width: 420px;
+      animation: fadeSlideUp 0.6s ease-out;
+    }
+
+    .auth-header {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    .auth-header .brand-label {
+      font-size: 0.7rem;
+      font-weight: 500;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    .auth-header h1 {
+      font-size: 2rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      background: linear-gradient(135deg, var(--text-primary) 0%, var(--text-secondary) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 8px;
+    }
+
+    .auth-header p {
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
+
+    .form-group input {
+      width: 100%;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 14px 16px;
+      font-family: 'Outfit', sans-serif;
+      font-size: 1rem;
+      color: var(--text-primary);
+      transition: all 0.2s ease;
+    }
+
+    .form-group input:focus {
+      outline: none;
+      border-color: var(--accent-blue);
+      box-shadow: 0 0 0 3px rgba(77, 166, 255, 0.1);
+    }
+
+    .form-group input::placeholder {
+      color: var(--text-muted);
+    }
+
+    .form-group .hint {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 6px;
+    }
+
+    .auth-btn {
+      width: 100%;
+      background: var(--accent-teal);
+      border: none;
+      border-radius: 12px;
+      padding: 16px;
+      font-family: 'Outfit', sans-serif;
+      font-size: 1rem;
+      font-weight: 500;
+      color: var(--bg-deep);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      margin-top: 8px;
+    }
+
+    .auth-btn:hover:not(:disabled) {
+      background: #00e6b8;
+      transform: translateY(-1px);
+    }
+
+    .auth-btn:disabled {
+      background: var(--text-muted);
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+
+    .auth-footer {
+      text-align: center;
+      margin-top: 24px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border-subtle);
+    }
+
+    .auth-footer p {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+    }
+
+    .auth-footer a {
+      color: var(--accent-teal);
+      text-decoration: none;
+      font-weight: 500;
+      transition: color 0.2s ease;
+    }
+
+    .auth-footer a:hover {
+      color: #00e6b8;
+    }
+
+    .error-message {
+      background: rgba(255, 92, 114, 0.1);
+      border: 1px solid rgba(255, 92, 114, 0.2);
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 20px;
+      color: var(--accent-error);
+      font-size: 0.9rem;
+      display: none;
+    }
+
+    .error-message.visible {
+      display: block;
+      animation: fadeSlideDown 0.3s ease-out;
+    }
+
+    .success-message {
+      background: rgba(0, 212, 170, 0.1);
+      border: 1px solid rgba(0, 212, 170, 0.2);
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 20px;
+      color: var(--accent-teal);
+      font-size: 0.9rem;
+      display: none;
+    }
+
+    .success-message.visible {
+      display: block;
+      animation: fadeSlideDown 0.3s ease-out;
+    }
+
+    .loading-spinner {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid transparent;
+      border-top-color: var(--bg-deep);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .form-row {
+      display: flex;
+      gap: 16px;
+    }
+
+    .form-row .form-group {
+      flex: 1;
+    }
+
+    @media (max-width: 480px) {
+      .form-row {
+        flex-direction: column;
+        gap: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="auth-container">
+    <div class="auth-card">
+      <div class="auth-header">
+        <div class="brand-label">Document Intelligence</div>
+        <h1>mattervault</h1>
+        <p>Create your account</p>
+      </div>
+
+      <div class="error-message" id="errorMessage"></div>
+      <div class="success-message" id="successMessage"></div>
+
+      <form id="registerForm">
+        <div class="form-group">
+          <label for="email">Email</label>
+          <input type="email" id="email" name="email" placeholder="you@example.com" required autocomplete="email">
+        </div>
+
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input type="password" id="password" name="password" placeholder="Choose a strong password" required autocomplete="new-password" minlength="8">
+          <div class="hint">At least 8 characters</div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="familyId">Family ID</label>
+            <input type="text" id="familyId" name="family_id" placeholder="e.g., morrison" required>
+            <div class="hint">Your family document group</div>
+          </div>
+
+          <div class="form-group">
+            <label for="displayName">Display Name</label>
+            <input type="text" id="displayName" name="display_name" placeholder="Your name (optional)">
+          </div>
+        </div>
+
+        <button type="submit" class="auth-btn" id="submitBtn">
+          Create Account
+        </button>
+      </form>
+
+      <div class="auth-footer">
+        <p>Already have an account? <a href="/login.html">Sign in</a></p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Check if already logged in
+    const accessToken = sessionStorage.getItem('accessToken');
+    if (accessToken) {
+      window.location.href = '/';
+    }
+
+    const form = document.getElementById('registerForm');
+    const errorMessage = document.getElementById('errorMessage');
+    const successMessage = document.getElementById('successMessage');
+    const submitBtn = document.getElementById('submitBtn');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      const familyId = document.getElementById('familyId').value;
+      const displayName = document.getElementById('displayName').value;
+
+      // Hide previous messages
+      errorMessage.classList.remove('visible');
+      successMessage.classList.remove('visible');
+
+      // Show loading state
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<span class="loading-spinner"></span>Creating account...';
+
+      try {
+        const res = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email,
+            password,
+            family_id: familyId,
+            display_name: displayName || undefined
+          }),
+          credentials: 'include' // Include cookies
+        });
+
+        const data = await res.json();
+
+        if (res.ok) {
+          // Store access token in sessionStorage
+          sessionStorage.setItem('accessToken', data.accessToken);
+          sessionStorage.setItem('user', JSON.stringify(data.user));
+
+          // Show success message briefly then redirect
+          successMessage.textContent = 'Account created! Redirecting...';
+          successMessage.classList.add('visible');
+
+          setTimeout(() => {
+            window.location.href = '/';
+          }, 1000);
+        } else {
+          // Show error
+          errorMessage.textContent = data.error || 'Registration failed';
+          errorMessage.classList.add('visible');
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Create Account';
+        }
+      } catch (err) {
+        errorMessage.textContent = 'Network error. Please try again.';
+        errorMessage.classList.add('visible');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Create Account';
+      }
+    });
+  </script>
+</body>
+</html>

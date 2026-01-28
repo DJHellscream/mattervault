@@ -1,0 +1,18 @@
+{
+  "name": "mattervault-chat-ui",
+  "version": "1.0.0",
+  "description": "Chat UI for Mattervault document intelligence",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "pg": "^8.13.0",
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2",
+    "ioredis": "^5.4.1",
+    "cookie-parser": "^1.4.7",
+    "express-rate-limit": "^7.5.0"
+  }
+}
