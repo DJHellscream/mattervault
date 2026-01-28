@@ -132,9 +132,30 @@ case "${1:-help}" in
             echo "Usage: $0 activate <workflow-id>"
             exit 1
         fi
-        api_request PATCH "/api/v1/workflows/$2" '{"active":true}' > /dev/null && \
+        # Use REST API to activate (POST /api/v1/workflows/{id}/activate)
+        echo -n "$API_KEY" > /tmp/n8n-api-key.txt
+        cat > /tmp/n8n-activate.js << 'JSEOF'
+const http = require('http');
+const fs = require('fs');
+const apiKey = fs.readFileSync('/tmp/api-key.txt', 'utf8').trim();
+const workflowId = process.argv[2];
+const req = http.request({
+  hostname: 'localhost', port: 5678,
+  path: '/api/v1/workflows/' + workflowId + '/activate',
+  method: 'POST',
+  headers: {'X-N8N-API-KEY': apiKey}
+}, res => {
+  let d=''; res.on('data', c => d+=c);
+  res.on('end', () => process.exit(res.statusCode < 300 ? 0 : 1));
+});
+req.end();
+JSEOF
+        docker cp /tmp/n8n-api-key.txt "$CONTAINER:/tmp/api-key.txt"
+        docker cp /tmp/n8n-activate.js "$CONTAINER:/tmp/activate.js"
+        docker exec "$CONTAINER" node /tmp/activate.js "$2" && \
             echo "✓ Activated: $2" || \
             echo "✗ Failed to activate $2"
+        rm -f /tmp/n8n-api-key.txt
         ;;
 
     deactivate)
@@ -142,9 +163,30 @@ case "${1:-help}" in
             echo "Usage: $0 deactivate <workflow-id>"
             exit 1
         fi
-        api_request PATCH "/api/v1/workflows/$2" '{"active":false}' > /dev/null && \
+        # Use REST API to deactivate (POST /api/v1/workflows/{id}/deactivate)
+        echo -n "$API_KEY" > /tmp/n8n-api-key.txt
+        cat > /tmp/n8n-deactivate.js << 'JSEOF'
+const http = require('http');
+const fs = require('fs');
+const apiKey = fs.readFileSync('/tmp/api-key.txt', 'utf8').trim();
+const workflowId = process.argv[2];
+const req = http.request({
+  hostname: 'localhost', port: 5678,
+  path: '/api/v1/workflows/' + workflowId + '/deactivate',
+  method: 'POST',
+  headers: {'X-N8N-API-KEY': apiKey}
+}, res => {
+  let d=''; res.on('data', c => d+=c);
+  res.on('end', () => process.exit(res.statusCode < 300 ? 0 : 1));
+});
+req.end();
+JSEOF
+        docker cp /tmp/n8n-api-key.txt "$CONTAINER:/tmp/api-key.txt"
+        docker cp /tmp/n8n-deactivate.js "$CONTAINER:/tmp/deactivate.js"
+        docker exec "$CONTAINER" node /tmp/deactivate.js "$2" && \
             echo "✓ Deactivated: $2" || \
             echo "✗ Failed to deactivate $2"
+        rm -f /tmp/n8n-api-key.txt
         ;;
 
     help|--help|-h|*)
