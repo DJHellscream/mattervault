@@ -102,6 +102,92 @@
       color: var(--text-secondary);
       font-size: 0.95rem;
     }
+
+    /* Export dropdown styles */
+    .export-dropdown {
+      position: relative;
+      display: none;
+    }
+
+    .export-dropdown.visible {
+      display: block;
+    }
+
+    .export-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(0, 212, 170, 0.1);
+      border: 1px solid rgba(0, 212, 170, 0.2);
+      border-radius: 8px;
+      padding: 8px 12px;
+      cursor: pointer;
+      color: var(--accent-teal);
+      font-family: 'Outfit', sans-serif;
+      font-size: 0.85rem;
+      font-weight: 500;
+      transition: all 0.2s ease;
+    }
+
+    .export-btn:hover {
+      background: rgba(0, 212, 170, 0.2);
+      border-color: rgba(0, 212, 170, 0.4);
+    }
+
+    .export-menu {
+      position: absolute;
+      top: 100%;
+      right: 0;
+      margin-top: 4px;
+      background: var(--bg-surface);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      padding: 6px;
+      min-width: 160px;
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(-8px);
+      transition: all 0.2s ease;
+      z-index: 50;
+    }
+
+    .export-dropdown.open .export-menu {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0);
+    }
+
+    .export-menu-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      background: transparent;
+      border: none;
+      border-radius: 6px;
+      padding: 10px 12px;
+      cursor: pointer;
+      color: var(--text-primary);
+      font-family: 'Outfit', sans-serif;
+      font-size: 0.9rem;
+      text-align: left;
+      transition: all 0.15s ease;
+    }
+
+    .export-menu-item:hover {
+      background: rgba(0, 212, 170, 0.1);
+      color: var(--accent-teal);
+    }
+
+    .export-menu-item svg {
+      opacity: 0.7;
+    }
+
+    .export-menu-item:hover svg {
+      opacity: 1;
+    }
   </style>
 </head>
 <body>
@@ -164,6 +250,36 @@
               <option value="">Loading families...</option>
             </select>
             <span class="doc-count" id="docCount" style="display: none;"></span>
+          </div>
+          <div class="export-dropdown" id="exportDropdown">
+            <button class="export-btn" id="exportBtn" title="Export conversation">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+              Export
+            </button>
+            <div class="export-menu">
+              <button class="export-menu-item" id="exportMarkdown">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                  <polyline points="14 2 14 8 20 8"></polyline>
+                  <line x1="16" y1="13" x2="8" y2="13"></line>
+                  <line x1="16" y1="17" x2="8" y2="17"></line>
+                  <polyline points="10 9 9 9 8 9"></polyline>
+                </svg>
+                Markdown (.md)
+              </button>
+              <button class="export-menu-item" id="exportPdf">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                  <polyline points="14 2 14 8 20 8"></polyline>
+                  <path d="M9 15v-2h2.5a1.5 1.5 0 0 0 0-3H9v5"></path>
+                </svg>
+                PDF Document (.pdf)
+              </button>
+            </div>
           </div>
           <div class="user-menu" id="userMenu">
             <div class="user-info">
@@ -254,6 +370,10 @@
     const deleteModal = document.getElementById('deleteModal');
     const deleteCancel = document.getElementById('deleteCancel');
     const deleteConfirm = document.getElementById('deleteConfirm');
+    const exportDropdown = document.getElementById('exportDropdown');
+    const exportBtn = document.getElementById('exportBtn');
+    const exportMarkdown = document.getElementById('exportMarkdown');
+    const exportPdf = document.getElementById('exportPdf');
 
     // Initialize
     async function init() {
@@ -480,6 +600,9 @@
         // Update sidebar highlight
         renderConversationList();
 
+        // Show export button
+        updateExportVisibility();
+
         // Close mobile sidebar
         closeMobileSidebar();
 
@@ -505,6 +628,7 @@
         </div>
       `;
       renderConversationList();
+      updateExportVisibility();
       closeMobileSidebar();
       questionInput.focus();
     }
@@ -568,6 +692,18 @@
           await deleteConversation(deleteTargetId);
           deleteModal.classList.remove('active');
           deleteTargetId = null;
+        }
+      });
+
+      // Export dropdown
+      exportBtn.addEventListener('click', toggleExportDropdown);
+      exportMarkdown.addEventListener('click', () => exportConversation('markdown'));
+      exportPdf.addEventListener('click', () => exportConversation('pdf'));
+
+      // Close export dropdown when clicking outside
+      document.addEventListener('click', (e) => {
+        if (!exportDropdown.contains(e.target)) {
+          exportDropdown.classList.remove('open');
         }
       });
     }
@@ -676,6 +812,8 @@
           // Update conversation ID if new conversation was created
           if (data.conversation_id && !currentConversationId) {
             currentConversationId = data.conversation_id;
+            // Show export button now that we have a conversation
+            updateExportVisibility();
             // Reload conversations to show the new one
             await loadConversations();
           }
@@ -926,6 +1064,86 @@
       }
 
       return citationMap;
+    }
+
+    /**
+     * Toggle export dropdown visibility
+     */
+    function toggleExportDropdown(e) {
+      e.stopPropagation();
+      exportDropdown.classList.toggle('open');
+    }
+
+    /**
+     * Show or hide export dropdown based on conversation state
+     */
+    function updateExportVisibility() {
+      if (currentConversationId) {
+        exportDropdown.classList.add('visible');
+      } else {
+        exportDropdown.classList.remove('visible');
+        exportDropdown.classList.remove('open');
+      }
+    }
+
+    /**
+     * Export conversation in specified format
+     * @param {string} format - 'markdown' or 'pdf'
+     */
+    async function exportConversation(format) {
+      if (!currentConversationId) {
+        addMessage('error', 'No conversation selected to export');
+        return;
+      }
+
+      // Close the dropdown
+      exportDropdown.classList.remove('open');
+
+      // Find the conversation title for the filename
+      const conv = conversations.find(c => c.id === currentConversationId);
+      const title = conv?.title || 'conversation';
+      const sanitizedTitle = title.replace(/[^a-zA-Z0-9\s\-_]/g, '').replace(/\s+/g, '_').substring(0, 100) || 'conversation';
+
+      const extension = format === 'pdf' ? 'pdf' : 'md';
+      const filename = `${sanitizedTitle}.${extension}`;
+
+      try {
+        // For download, we use a direct link approach
+        const response = await authFetch(`/api/conversations/${currentConversationId}/export?format=${format}`);
+
+        if (!response.ok) {
+          const data = await response.json();
+          throw new Error(data.error || 'Export failed');
+        }
+
+        // Get the blob from response
+        const blob = await response.blob();
+
+        // Create download link
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+
+        // Cleanup
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+
+        // Show success message briefly
+        addMessage('system', `Exported conversation as ${format.toUpperCase()}`);
+        setTimeout(() => {
+          const systemMessages = messages.querySelectorAll('.message.system');
+          const lastSystem = systemMessages[systemMessages.length - 1];
+          if (lastSystem && lastSystem.textContent.includes('Exported conversation')) {
+            lastSystem.remove();
+          }
+        }, 3000);
+      } catch (err) {
+        console.error('Export error:', err);
+        addMessage('error', `Failed to export: ${err.message}`);
+      }
     }
 
     init();

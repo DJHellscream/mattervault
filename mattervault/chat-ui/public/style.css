@@ -893,6 +893,92 @@ a.source-citation.clickable::before {
   margin-top: 10px;
 }
 
+/* Export dropdown styles */
+.export-dropdown {
+  position: relative;
+  display: none;
+}
+
+.export-dropdown.visible {
+  display: block;
+}
+
+.export-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(0, 212, 170, 0.1);
+  border: 1px solid rgba(0, 212, 170, 0.2);
+  border-radius: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  color: var(--accent-teal);
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.export-btn:hover {
+  background: rgba(0, 212, 170, 0.2);
+  border-color: rgba(0, 212, 170, 0.4);
+}
+
+.export-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  background: var(--bg-surface);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  padding: 6px;
+  min-width: 160px;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-8px);
+  transition: all 0.2s ease;
+  z-index: 50;
+}
+
+.export-dropdown.open .export-menu {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.export-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  padding: 10px 12px;
+  cursor: pointer;
+  color: var(--text-primary);
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.9rem;
+  text-align: left;
+  transition: all 0.15s ease;
+}
+
+.export-menu-item:hover {
+  background: rgba(0, 212, 170, 0.1);
+  color: var(--accent-teal);
+}
+
+.export-menu-item svg {
+  opacity: 0.7;
+}
+
+.export-menu-item:hover svg {
+  opacity: 1;
+}
+
 /* Responsive */
 @media (max-width: 900px) {
   .sidebar {
@@ -947,6 +1033,20 @@ a.source-citation.clickable::before {
   .user-menu {
     width: 100%;
     justify-content: space-between;
+  }
+
+  .export-dropdown.visible {
+    width: 100%;
+  }
+
+  .export-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .export-menu {
+    left: 0;
+    right: 0;
   }
 
   h1 {
