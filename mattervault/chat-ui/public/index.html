@@ -3,19 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="theme-color" content="#0a0e1a">
   <title>mattervault chat</title>
   <link rel="stylesheet" href="/style.css">
   <style>
-    /* User menu styles */
-    .user-menu {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-
+    /* User menu styles - base styles only, responsive overrides in style.css */
     .user-info {
       display: flex;
       align-items: center;
@@ -48,49 +42,6 @@
     .user-family {
       font-size: 0.75rem;
       color: var(--text-muted);
-    }
-
-    .logout-btn {
-      background: rgba(255, 92, 114, 0.1);
-      border: 1px solid rgba(255, 92, 114, 0.2);
-      border-radius: 8px;
-      padding: 8px 12px;
-      cursor: pointer;
-      color: var(--accent-error);
-      font-family: 'Outfit', sans-serif;
-      font-size: 0.85rem;
-      font-weight: 500;
-      transition: all 0.2s ease;
-    }
-
-    .logout-btn:hover {
-      background: rgba(255, 92, 114, 0.2);
-      border-color: rgba(255, 92, 114, 0.4);
-    }
-
-    .admin-link {
-      display: none;
-      align-items: center;
-      gap: 6px;
-      background: rgba(0, 212, 170, 0.1);
-      border: 1px solid rgba(0, 212, 170, 0.2);
-      border-radius: 8px;
-      padding: 8px 12px;
-      color: var(--accent-teal);
-      font-family: 'Outfit', sans-serif;
-      font-size: 0.85rem;
-      font-weight: 500;
-      text-decoration: none;
-      transition: all 0.2s ease;
-    }
-
-    .admin-link:hover {
-      background: rgba(0, 212, 170, 0.2);
-      border-color: rgba(0, 212, 170, 0.4);
-    }
-
-    .admin-link.visible {
-      display: flex;
     }
 
     /* Loading overlay for auth check */
@@ -610,7 +561,7 @@
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
               </svg>
-              Audit Logs
+              <span>Audit Logs</span>
             </a>
             <button class="logout-btn" id="logoutBtn">Logout</button>
           </div>
@@ -1127,15 +1078,35 @@
       });
     }
 
-    // Toggle sidebar (desktop)
+    // Check if we're in mobile viewport
+    function isMobileViewport() {
+      return window.innerWidth <= 900;
+    }
+
+    // Toggle sidebar (desktop) - or close on mobile
     function toggleSidebar() {
-      sidebar.classList.toggle('collapsed');
+      if (isMobileViewport()) {
+        // On mobile, this button should close the sidebar
+        closeMobileSidebar();
+      } else {
+        // On desktop, toggle collapsed state
+        sidebar.classList.toggle('collapsed');
+      }
     }
 
     // Toggle mobile sidebar
     function toggleMobileSidebar() {
-      sidebar.classList.toggle('mobile-open');
-      sidebarOverlay.classList.toggle('active');
+      const isOpen = sidebar.classList.contains('mobile-open');
+
+      if (isOpen) {
+        // Close
+        closeMobileSidebar();
+      } else {
+        // Open - also remove collapsed class to show full sidebar
+        sidebar.classList.remove('collapsed');
+        sidebar.classList.add('mobile-open');
+        sidebarOverlay.classList.add('active');
+      }
     }
 
     // Close mobile sidebar
