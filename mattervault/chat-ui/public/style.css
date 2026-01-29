@@ -1142,62 +1142,75 @@ a.source-citation.clickable::before {
 @media (max-width: 768px) {
   /* Safe area padding for notched devices */
   body {
-    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    padding-top: env(safe-area-inset-top);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
   }
 
+  /* App layout - remove sidebar space on mobile */
+  .app-layout {
+    display: block;
+    height: 100vh;
+    height: 100dvh;
+  }
+
+  /* Main container - full width, no left padding for hamburger */
   .container {
-    padding: 12px;
-    padding-left: 56px;
-    padding-bottom: 0; /* Input area handles bottom padding */
+    padding: 0;
+    height: 100vh;
+    height: 100dvh;
+    max-width: 100%;
+    display: flex;
+    flex-direction: column;
   }
 
-  /* Compact header for mobile */
+  /* Mobile header - clean bar at top */
   header {
-    flex-direction: row;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 12px;
-    padding-bottom: 16px;
-    position: sticky;
-    top: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px 16px;
+    padding-left: 60px; /* Space for hamburger */
     background: var(--bg-deep);
-    z-index: 10;
-    margin: -12px -12px 0 -56px;
-    padding: 12px 12px 12px 56px;
     border-bottom: 1px solid var(--border-subtle);
+    flex-shrink: 0;
   }
 
+  /* Top row: brand + user actions */
   .brand {
-    flex: 1;
-    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
   }
 
   .brand-label {
-    display: none; /* Hide on mobile to save space */
+    display: none;
   }
 
   h1 {
-    font-size: 1.3rem;
+    font-size: 1.25rem;
+    margin: 0;
   }
 
-  /* Mobile header controls - horizontal compact layout */
+  /* Header controls - second row */
   .header-controls {
-    width: 100%;
+    display: flex;
     flex-direction: row;
-    flex-wrap: wrap;
-    gap: 8px;
-    order: 2;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
   }
 
   .family-selector {
     flex: 1;
-    min-width: 140px;
+    min-width: 0;
   }
 
-  /* Compact select on mobile */
+  /* Compact select */
   select {
+    width: 100%;
     padding: 10px 36px 10px 12px;
-    font-size: 0.85rem;
+    font-size: 0.9rem;
     min-width: auto;
     border-radius: 10px;
   }
@@ -1207,7 +1220,7 @@ a.source-citation.clickable::before {
     display: none !important;
   }
 
-  /* User menu compact */
+  /* User menu - right side of header */
   .user-menu {
     display: flex;
     gap: 8px;
@@ -1221,10 +1234,15 @@ a.source-citation.clickable::before {
   .admin-link {
     padding: 10px;
     border-radius: 10px;
+    min-height: 40px;
+    min-width: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .admin-link span {
-    display: none; /* Icon only on mobile */
+    display: none;
   }
 
   .admin-link svg {
@@ -1235,36 +1253,40 @@ a.source-citation.clickable::before {
   .logout-btn {
     padding: 10px 14px;
     font-size: 0.8rem;
+    min-height: 40px;
   }
 
-  /* Hide export on mobile - use share sheet instead */
+  /* Hide export on mobile */
   .export-dropdown {
     display: none !important;
   }
 
-  /* Chat container fills remaining space */
+  /* Chat container - fills remaining space */
   .chat-container {
-    padding-top: 12px;
+    flex: 1;
     display: flex;
     flex-direction: column;
-    height: calc(100vh - 140px);
-    height: calc(100dvh - 140px); /* Dynamic viewport height */
+    min-height: 0;
+    padding: 0;
+    overflow: hidden;
   }
 
-  /* Messages area */
+  /* Messages area - aligned with input below */
   .messages {
     flex: 1;
-    border-radius: 16px 16px 0 0;
-    padding: 12px;
-    margin-bottom: 0;
-    /* Momentum scrolling */
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+    padding: 12px 16px;
+    margin: 0;
+    min-height: 0;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
   }
 
-  /* Message bubbles optimized for mobile */
+  /* Message bubbles */
   .message {
-    max-width: 88%;
+    max-width: 85%;
   }
 
   .message-content {
@@ -1286,13 +1308,13 @@ a.source-citation.clickable::before {
     font-size: 0.65rem;
   }
 
-  /* Copy button always visible on mobile (no hover) */
+  /* Copy button always visible on mobile */
   .copy-btn {
     opacity: 0.7;
     padding: 8px 10px;
   }
 
-  /* Welcome message compact */
+  /* Welcome message */
   .welcome-message {
     padding: 40px 16px;
   }
@@ -1310,19 +1332,21 @@ a.source-citation.clickable::before {
     height: 40px;
   }
 
-  /* Input area - thumb-friendly bottom position */
+  /* Input area - aligned with messages, proper bottom spacing */
   .input-area {
-    border-radius: 16px 16px 0 0;
-    padding: 12px;
-    padding-bottom: calc(12px + env(safe-area-inset-bottom));
-    position: sticky;
-    bottom: 0;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
+    padding: 12px 16px;
+    padding-bottom: calc(16px + env(safe-area-inset-bottom));
     background: var(--bg-surface);
     border-top: 1px solid var(--border-subtle);
+    flex-shrink: 0;
   }
 
   .input-wrapper {
-    border-radius: 24px; /* Pill shape on mobile */
+    border-radius: 24px;
     padding: 4px 4px 4px 16px;
   }
 
@@ -1347,18 +1371,18 @@ a.source-citation.clickable::before {
   .input-hint {
     font-size: 0.7rem;
     margin-top: 8px;
+    text-align: center;
   }
 
-  /* Mobile sidebar toggle - larger touch target */
+  /* Mobile sidebar toggle - positioned in header area */
   .mobile-sidebar-toggle {
+    position: fixed;
     left: 12px;
     top: 12px;
     width: 44px;
     height: 44px;
     padding: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    z-index: 50;
   }
 
   .mobile-sidebar-toggle svg {
@@ -1366,7 +1390,7 @@ a.source-citation.clickable::before {
     height: 22px;
   }
 
-  /* Sidebar improvements for mobile */
+  /* Sidebar */
   .sidebar {
     width: 85%;
     max-width: 320px;
@@ -1392,12 +1416,12 @@ a.source-citation.clickable::before {
     justify-content: center;
   }
 
-  /* Conversation items - larger touch targets */
+  /* Conversation items */
   .conversation-item {
     padding: 14px 16px;
     margin-bottom: 6px;
     border-radius: 12px;
-    min-height: 64px;
+    min-height: 60px;
   }
 
   .conversation-title {
@@ -1409,7 +1433,6 @@ a.source-citation.clickable::before {
     font-size: 0.8rem;
   }
 
-  /* Delete button always visible on mobile */
   .conversation-delete {
     opacity: 1;
     width: 36px;
@@ -1420,15 +1443,15 @@ a.source-citation.clickable::before {
     justify-content: center;
   }
 
-  /* Modal adjustments for mobile */
+  /* Modal - bottom sheet */
   .modal-overlay {
-    padding: 16px;
-    align-items: flex-end; /* Bottom sheet style */
+    padding: 0;
+    align-items: flex-end;
   }
 
   .modal {
     border-radius: 20px 20px 0 0;
-    padding: 24px;
+    padding: 24px 20px;
     padding-bottom: calc(24px + env(safe-area-inset-bottom));
     max-width: 100%;
     width: 100%;
@@ -1467,7 +1490,7 @@ a.source-citation.clickable::before {
     border-radius: 12px;
   }
 
-  /* Document preview panel - full screen on mobile */
+  /* Document preview - full screen */
   .doc-preview-panel {
     width: 100%;
     right: -100%;
@@ -1487,7 +1510,7 @@ a.source-citation.clickable::before {
     justify-content: center;
   }
 
-  /* Source citations - more tappable */
+  /* Source citations */
   .source-citation {
     padding: 6px 12px;
     font-size: 0.85em;
@@ -1502,19 +1525,26 @@ a.source-citation.clickable::before {
 }
 
 /* Small phone breakpoint (480px) */
+/* Small phone breakpoint (480px) */
 @media (max-width: 480px) {
-  .container {
-    padding: 10px;
-    padding-left: 52px;
-  }
-
+  /* Header more compact */
   header {
-    margin: -10px -10px 0 -52px;
-    padding: 10px 10px 10px 52px;
+    padding: 10px 12px;
+    padding-left: 54px;
+    gap: 8px;
   }
 
   h1 {
-    font-size: 1.15rem;
+    font-size: 1.1rem;
+  }
+
+  .header-controls {
+    gap: 8px;
+  }
+
+  select {
+    padding: 8px 32px 8px 10px;
+    font-size: 0.85rem;
   }
 
   .mobile-sidebar-toggle {
@@ -1530,13 +1560,13 @@ a.source-citation.clickable::before {
     max-width: none;
   }
 
-  /* Even more compact messages */
+  /* Compact messages */
   .messages {
-    padding: 10px;
+    padding: 10px 12px;
   }
 
   .message {
-    max-width: 92%;
+    max-width: 90%;
   }
 
   .message-content {
@@ -1544,9 +1574,10 @@ a.source-citation.clickable::before {
     font-size: 0.88rem;
   }
 
+  /* Input area aligned */
   .input-area {
-    padding: 10px;
-    padding-bottom: calc(10px + env(safe-area-inset-bottom));
+    padding: 10px 12px;
+    padding-bottom: calc(14px + env(safe-area-inset-bottom));
   }
 
   .input-wrapper input {
@@ -1562,6 +1593,8 @@ a.source-citation.clickable::before {
   .logout-btn {
     padding: 10px;
     font-size: 0;
+    min-width: 40px;
+    min-height: 40px;
     position: relative;
   }
 
