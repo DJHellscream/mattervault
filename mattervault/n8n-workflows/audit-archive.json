@@ -1,6 +1,6 @@
 [{
   "name": "Audit Archive (7-Year Retention)",
-  "description": "Archives audit partitions older than 7 years to compressed JSONL files in /files/audit-archives/. Runs on 2nd of each month.",
+  "description": "Archives audit partitions older than 7 years to JSONL files in /files/audit-archives/. Runs on 2nd of each month.",
   "active": true,
   "nodes": [
     {
@@ -112,16 +112,6 @@
     },
     {
       "parameters": {
-        "command": "=gzip -f {{ $json.filepath }} && echo 'Compressed to {{ $json.filepath }}.gz'"
-      },
-      "id": "compress-file",
-      "name": "Compress Archive",
-      "type": "n8n-nodes-base.executeCommand",
-      "typeVersion": 1,
-      "position": [1300, 300]
-    },
-    {
-      "parameters": {
         "operation": "executeQuery",
         "query": "=-- Get row count before dropping for verification\nSELECT COUNT(*) as archived_rows FROM audit.{{ $('Prepare Archive Data').first().json.partition_name }};",
         "options": {}
@@ -130,7 +120,7 @@
       "name": "Verify Row Count",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [1500, 300],
+      "position": [1300, 300],
       "credentials": {
         "postgres": {
           "id": "chatui-db",
@@ -158,7 +148,7 @@
       "name": "Archive Complete?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
-      "position": [1700, 300]
+      "position": [1500, 300]
     },
     {
       "parameters": {
@@ -170,7 +160,7 @@
       "name": "Drop Partition",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [1900, 250],
+      "position": [1700, 250],
       "credentials": {
         "postgres": {
           "id": "chatui-db",
@@ -186,17 +176,17 @@
       "name": "Archive Failed",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1900, 450]
+      "position": [1700, 450]
     },
     {
       "parameters": {
-        "jsCode": "// Final success summary\nconst archiveData = $('Prepare Archive Data').first().json;\nconst compressResult = $('Compress Archive').first().json;\n\nreturn [{\n  json: {\n    status: 'success',\n    message: `Successfully archived and dropped partition`,\n    partition: archiveData.partition_name,\n    rows_archived: archiveData.row_count,\n    archive_file: `${archiveData.filepath}.gz`,\n    timestamp: new Date().toISOString()\n  }\n}];"
+        "jsCode": "// Final success summary\nconst archiveData = $('Prepare Archive Data').first().json;\n\nreturn [{\n  json: {\n    status: 'success',\n    message: 'Successfully archived and dropped partition',\n    partition: archiveData.partition_name,\n    rows_archived: archiveData.row_count,\n    archive_file: archiveData.filepath,\n    timestamp: new Date().toISOString()\n  }\n}];"
       },
       "id": "success-summary",
       "name": "Success Summary",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2100, 250]
+      "position": [1900, 250]
     }
   ],
   "connections": {
@@ -219,9 +209,6 @@
       "main": [[{ "node": "Write Archive File", "type": "main", "index": 0 }]]
     },
     "Write Archive File": {
-      "main": [[{ "node": "Compress Archive", "type": "main", "index": 0 }]]
-    },
-    "Compress Archive": {
       "main": [[{ "node": "Verify Row Count", "type": "main", "index": 0 }]]
     },
     "Verify Row Count": {

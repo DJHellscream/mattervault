@@ -6,8 +6,9 @@
 CREATE SCHEMA IF NOT EXISTS audit;
 
 -- Create partitioned audit log table
+-- Note: Primary key must include partition column (created_at) for partitioned tables
 CREATE TABLE IF NOT EXISTS audit.chat_query_logs (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id UUID DEFAULT gen_random_uuid(),
 
     -- Correlation tracking
     correlation_id UUID NOT NULL,
@@ -35,7 +36,10 @@ CREATE TABLE IF NOT EXISTS audit.chat_query_logs (
     total_latency_ms INTEGER,
 
     -- Timestamp (partition key)
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+
+    -- Composite primary key must include partition column
+    PRIMARY KEY (id, created_at)
 ) PARTITION BY RANGE (created_at);
 
 -- Create indexes on parent table (will be inherited by partitions)
