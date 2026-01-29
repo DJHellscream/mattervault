@@ -243,6 +243,9 @@ services:
       - OLLAMA_MODEL=${OLLAMA_CHAT_MODEL:-llama3.1:8b}
       # Conversation context (sliding window)
       - CHAT_HISTORY_LIMIT=${CHAT_HISTORY_LIMIT:-10}
+    volumes:
+      - D:\CCC\mattervault\chat-ui\public:/app/public
+      - D:\CCC\mattervault\chat-ui\src:/app/src
     depends_on:
       - paperless
       - qdrant
@@ -251,6 +254,27 @@ services:
       - redis
     networks:
       - matternet
+
+  # ----------------------------------------------------------------------------
+  # ZONE 5: E2E TEST RUNNER (optional - for testing)
+  # Usage: docker compose up -d e2e && docker exec e2e-runner /e2e/test.sh
+  # ----------------------------------------------------------------------------
+  e2e:
+    build: ./e2e
+    container_name: e2e-runner
+    profiles: ["test"]  # Only starts with: docker compose --profile test up -d
+    volumes:
+      - D:\CCC\mattervault\intake:/files/intake
+      - "D:\\CCC\\demo data:/files/demo:ro"
+    networks:
+      - matternet
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - paperless
+      - n8n
+      - qdrant
+      - db-chatui
 
 # ------------------------------------------------------------------------------
 # NETWORKS & VOLUMES
