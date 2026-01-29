@@ -10,6 +10,7 @@
 - E2E test infrastructure
 - CLAUDE.md documentation update
 - Admin UI for audit logs (with role sync from Paperless)
+- Mobile Chat UI (responsive layout, touch gestures, icon-only header on small screens)
 
 ---
 
@@ -42,13 +43,6 @@
 - Paperless webhooks can trigger n8n workflows for sync
 - Critical for keeping vector store consistent with source of truth
 
-### Polish
-
-**Mobile Chat UI**
-- Improve responsive design for chat-ui
-- Better touch interactions
-- Conversation list on mobile
-
 ---
 
 ## Decision Factors
@@ -59,7 +53,6 @@
 | Per-family access | High | Medium | Paperless permissions setup |
 | Production hardening | Medium | High | Domain, certs |
 | Document change/delete sync | Medium | High | Paperless webhook config |
-| Mobile chat UI | Medium | Medium | Design decisions |
 
 ---
 
