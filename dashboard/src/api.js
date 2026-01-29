@@ -1,4 +1,24 @@
 const express = require('express');
+const { Pool } = require('pg');
+
+// ChatUI database pool for recent queries
+let chatuiPool = null;
+
+function getChatuiPool() {
+  if (!chatuiPool) {
+    chatuiPool = new Pool({
+      host: process.env.CHATUI_DB_HOST || 'matterdb-chatui',
+      port: parseInt(process.env.CHATUI_DB_PORT || '5432'),
+      database: process.env.CHATUI_DB_NAME || 'chatui',
+      user: process.env.CHATUI_DB_USER || 'chatui',
+      password: process.env.CHATUI_DB_PASS || 'chatui_secure_pass',
+      max: 3,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 5000
+    });
+  }
+  return chatuiPool;
+}
 
 function createApiRouter(storage, config, scheduler, healthChecker, broadcast, alerter) {
   const router = express.Router();
@@ -146,6 +166,33 @@ function createApiRouter(storage, config, scheduler, healthChecker, broadcast, a
     broadcast({ type: 'status', service: service.id, data: result });
 
     res.json(result);
+  });
+
+  // GET /api/recent-queries - recent audit log entries from chat-ui database
+  router.get('/recent-queries', async (req, res) => {
+    try {
+      const pool = getChatuiPool();
+      const limit = Math.min(parseInt(req.query.limit) || 10, 50);
+
+      const result = await pool.query(`
+        SELECT
+          correlation_id,
+          paperless_username,
+          family_id,
+          query_text,
+          total_latency_ms,
+          created_at
+        FROM audit.chat_query_logs
+        ORDER BY created_at DESC
+        LIMIT $1
+      `, [limit]);
+
+      res.json({ queries: result.rows });
+    } catch (err) {
+      // Gracefully handle if audit table doesn't exist yet
+      console.error('Recent queries error:', err.message);
+      res.json({ queries: [], error: 'Audit logs not available' });
+    }
   });
 
   return router;

@@ -1024,6 +1024,228 @@ body::after {
   background: var(--border-glow);
 }
 
+/* ============================================
+   SYSTEM STATS SECTION
+   ============================================ */
+.system-stats-section {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-dim);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 36px;
+  animation: fadeUp 0.6s ease-out 0.55s backwards;
+}
+
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.stat-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-dim);
+  border-radius: 10px;
+  padding: 20px;
+  transition: all 0.2s ease;
+}
+
+.stat-card:hover {
+  border-color: var(--border-active);
+}
+
+.stat-icon {
+  font-size: 1.8rem;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+.stat-icon.storage {
+  background: rgba(0, 212, 255, 0.15);
+  color: var(--accent-primary);
+}
+
+.stat-icon.memory {
+  background: rgba(168, 85, 247, 0.15);
+  color: var(--accent-secondary);
+}
+
+.stat-icon.uptime {
+  background: rgba(0, 255, 157, 0.15);
+  color: var(--status-up);
+}
+
+.stat-icon.latency {
+  background: rgba(251, 191, 36, 0.15);
+  color: var(--accent-tertiary);
+}
+
+.stat-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.stat-title {
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+}
+
+.stat-main {
+  font-family: 'Syne', sans-serif;
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--text-bright);
+  line-height: 1.1;
+}
+
+.stat-main.good { color: var(--status-up); }
+.stat-main.warn { color: var(--alert-warning); }
+.stat-main.bad { color: var(--status-down); }
+
+.stat-sub {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+}
+
+/* ============================================
+   RECENT ACTIVITY SECTION
+   ============================================ */
+.activity-section {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-dim);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 36px;
+  animation: fadeUp 0.6s ease-out 0.6s backwards;
+}
+
+.activity-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 10px;
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  margin-left: auto;
+}
+
+.activity-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.activity-empty {
+  padding: 32px;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 0.8rem;
+}
+
+.activity-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-dim);
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.activity-item:hover {
+  border-color: var(--border-active);
+}
+
+.activity-user {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--accent-primary);
+}
+
+.activity-query {
+  font-size: 0.8rem;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+.activity-meta {
+  display: flex;
+  gap: 16px;
+  font-size: 0.65rem;
+  color: var(--text-dim);
+}
+
+.activity-family {
+  background: var(--bg-elevated);
+  padding: 2px 8px;
+  border-radius: 4px;
+  text-transform: capitalize;
+}
+
+.activity-latency {
+  color: var(--text-secondary);
+}
+
+/* ============================================
+   SERVICE CARD ENHANCEMENTS
+   ============================================ */
+.card-uptime {
+  position: absolute;
+  top: 14px;
+  right: 12px;
+  font-size: 0.6rem;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--bg-elevated);
+  color: var(--text-dim);
+}
+
+.card-uptime.perfect {
+  background: var(--status-up-subtle);
+  color: var(--status-up);
+}
+
+.card-uptime.good {
+  background: rgba(52, 211, 153, 0.15);
+  color: var(--accent-quaternary);
+}
+
+.card-uptime.warn {
+  background: rgba(255, 159, 26, 0.15);
+  color: var(--alert-warning);
+}
+
+.card-uptime.bad {
+  background: var(--status-down-subtle);
+  color: var(--status-down);
+}
+
+.card-sparkline {
+  height: 24px;
+  padding: 0 8px 8px;
+  opacity: 0.8;
+}
+
+.card-sparkline svg {
+  display: block;
+}
+
 /* Utility */
 .hidden {
   display: none !important;
@@ -1034,6 +1256,10 @@ body::after {
    ============================================ */
 @media (max-width: 1200px) {
   .metrics-hero {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .stats-row {
     grid-template-columns: repeat(2, 1fr);
   }
 }
@@ -1080,6 +1306,24 @@ body::after {
     grid-template-columns: 1fr;
   }
 
+  .stats-row {
+    grid-template-columns: 1fr;
+  }
+
+  .stat-card {
+    padding: 16px;
+  }
+
+  .stat-icon {
+    width: 40px;
+    height: 40px;
+    font-size: 1.4rem;
+  }
+
+  .stat-main {
+    font-size: 1.2rem;
+  }
+
   .service-cards {
     grid-template-columns: 1fr;
   }
@@ -1098,5 +1342,10 @@ body::after {
 
   .family-grid {
     grid-template-columns: 1fr;
+  }
+
+  .activity-meta {
+    flex-wrap: wrap;
+    gap: 8px;
   }
 }

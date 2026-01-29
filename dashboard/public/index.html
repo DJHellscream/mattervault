@@ -130,6 +130,60 @@
       </div>
     </section>
 
+    <!-- System Stats Row -->
+    <section class="system-stats-section">
+      <div class="section-header">
+        <span class="section-marker">◆</span>
+        <h2>SYSTEM OVERVIEW</h2>
+      </div>
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-icon storage">⬡</div>
+          <div class="stat-info">
+            <span class="stat-title">QDRANT STORAGE</span>
+            <span class="stat-main" id="qdrantStorage">--</span>
+            <span class="stat-sub" id="qdrantSegments">-- segments</span>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon memory">◈</div>
+          <div class="stat-info">
+            <span class="stat-title">REDIS MEMORY</span>
+            <span class="stat-main" id="redisMemory">--</span>
+            <span class="stat-sub" id="redisClients">-- clients</span>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon uptime">◉</div>
+          <div class="stat-info">
+            <span class="stat-title">SYSTEM UPTIME</span>
+            <span class="stat-main" id="systemUptime">--%</span>
+            <span class="stat-sub" id="uptimeServices">--/-- services</span>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon latency">◇</div>
+          <div class="stat-info">
+            <span class="stat-title">AVG LATENCY</span>
+            <span class="stat-main" id="avgLatency">--ms</span>
+            <span class="stat-sub" id="latencyTrend">--</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Recent Activity -->
+    <section class="activity-section">
+      <div class="section-header">
+        <span class="section-marker">▷</span>
+        <h2>RECENT QUERIES</h2>
+        <span class="activity-badge" id="queryCount">0</span>
+      </div>
+      <div class="activity-list" id="recentQueries">
+        <div class="activity-empty">No recent queries</div>
+      </div>
+    </section>
+
     <!-- Service Details Modal -->
     <div class="details-overlay hidden" id="detailsOverlay">
       <div class="details-modal">
@@ -201,10 +255,21 @@
       await Promise.all([
         fetchStatus(),
         fetchMetrics(),
-        fetchAlerts()
+        fetchAlerts(),
+        fetchRecentQueries()
       ]);
       renderAll();
       connectWebSocket();
+
+      // Fetch detailed histories after initial render
+      setTimeout(fetchServiceHistories, 500);
+
+      // Refresh histories and queries periodically
+      setInterval(fetchServiceHistories, 60000);
+      setInterval(async () => {
+        await fetchRecentQueries();
+        renderRecentQueries();
+      }, 30000);
     }
 
     // Fetch functions
@@ -275,6 +340,8 @@
       renderFamilyBreakdown();
       renderServiceGroups();
       renderAlerts();
+      renderSystemStats();
+      renderRecentQueries();
       updateLastUpdate();
     }
 
@@ -396,7 +463,9 @@
               <div class="card-response">${data.responseTime ? data.responseTime + 'ms' : '---'}</div>
             </div>
             ${hasMetrics ? `<div class="card-metrics-indicator">●</div>` : ''}
+            <div class="card-uptime" id="uptime-${id}" title="24h uptime">--%</div>
           </div>
+          <div class="card-sparkline" id="spark-${id}"></div>
         </div>
       `;
     }
@@ -582,6 +651,151 @@
         selectedService = null;
       }
     };
+
+    // System Stats
+    function renderSystemStats() {
+      updateSystemStats();
+    }
+
+    function updateSystemStats() {
+      const services = metricsData.services || {};
+
+      // Qdrant storage
+      const qdrant = services['qdrant'] || {};
+      document.getElementById('qdrantStorage').textContent =
+        qdrant.vector_count ? `${(qdrant.vector_count).toLocaleString()} vectors` : '--';
+      document.getElementById('qdrantSegments').textContent =
+        qdrant.segments_count ? `${qdrant.segments_count} segments` : '-- segments';
+
+      // Redis memory
+      const redis = services['redis'] || {};
+      document.getElementById('redisMemory').textContent =
+        redis.memory_used_mb ? `${redis.memory_used_mb} MB` : '--';
+      document.getElementById('redisClients').textContent =
+        redis.connected_clients !== undefined ? `${redis.connected_clients} clients` : '-- clients';
+
+      // System uptime (calculated from all services)
+      const allServiceIds = [...SERVICE_GROUPS.core, ...SERVICE_GROUPS.databases, ...SERVICE_GROUPS.support];
+      const upServices = allServiceIds.filter(id => statusData.services[id]?.status === 'up').length;
+      const uptimePct = allServiceIds.length > 0 ? Math.round((upServices / allServiceIds.length) * 100) : 0;
+      document.getElementById('systemUptime').textContent = `${uptimePct}%`;
+      document.getElementById('systemUptime').className = `stat-main ${uptimePct === 100 ? 'good' : uptimePct >= 75 ? 'warn' : 'bad'}`;
+      document.getElementById('uptimeServices').textContent = `${upServices}/${allServiceIds.length} services`;
+
+      // Average latency
+      const responseTimes = allServiceIds
+        .map(id => statusData.services[id]?.responseTime)
+        .filter(rt => rt !== undefined && rt !== null);
+      const avgLatency = responseTimes.length > 0
+        ? Math.round(responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length)
+        : null;
+      document.getElementById('avgLatency').textContent = avgLatency ? `${avgLatency}ms` : '--';
+      document.getElementById('latencyTrend').textContent = avgLatency
+        ? (avgLatency < 100 ? 'Excellent' : avgLatency < 500 ? 'Good' : 'Slow')
+        : '--';
+    }
+
+    // Recent Queries (fetched from chat-ui)
+    let recentQueriesData = [];
+
+    async function fetchRecentQueries() {
+      try {
+        const res = await fetch('/api/recent-queries');
+        if (res.ok) {
+          const data = await res.json();
+          recentQueriesData = data.queries || [];
+        }
+      } catch (err) {
+        console.log('Recent queries not available');
+      }
+    }
+
+    function renderRecentQueries() {
+      const list = document.getElementById('recentQueries');
+      const badge = document.getElementById('queryCount');
+
+      if (!recentQueriesData.length) {
+        list.innerHTML = '<div class="activity-empty">No recent queries</div>';
+        badge.textContent = '0';
+        return;
+      }
+
+      badge.textContent = recentQueriesData.length;
+      list.innerHTML = recentQueriesData.slice(0, 5).map(q => {
+        const time = new Date(q.created_at).toLocaleTimeString();
+        const queryPreview = q.query_text?.substring(0, 60) + (q.query_text?.length > 60 ? '...' : '');
+        return `
+          <div class="activity-item">
+            <div class="activity-user">${q.paperless_username || 'unknown'}</div>
+            <div class="activity-query">${queryPreview || 'No query text'}</div>
+            <div class="activity-meta">
+              <span class="activity-family">${q.family_id || '--'}</span>
+              <span class="activity-time">${time}</span>
+              <span class="activity-latency">${q.total_latency_ms ? q.total_latency_ms + 'ms' : '--'}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Sparkline charts for service cards
+    function renderSparkline(elementId, history) {
+      const container = document.getElementById(elementId);
+      if (!container || !history || history.length < 2) {
+        if (container) container.innerHTML = '';
+        return;
+      }
+
+      const times = history.slice(-20).map(h => h.responseTime || 0);
+      const max = Math.max(...times, 1);
+      const width = container.offsetWidth || 100;
+      const height = 24;
+      const step = width / (times.length - 1);
+
+      const points = times.map((t, i) => `${i * step},${height - (t / max) * height}`).join(' ');
+
+      container.innerHTML = `
+        <svg width="100%" height="${height}" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none">
+          <polyline points="${points}" fill="none" stroke="var(--accent-primary)" stroke-width="1.5" opacity="0.6"/>
+        </svg>
+      `;
+    }
+
+    // Update uptime badge for a service
+    function updateUptimeBadge(id, history) {
+      const badge = document.getElementById(`uptime-${id}`);
+      if (!badge) return;
+
+      if (!history || history.length === 0) {
+        badge.textContent = '--%';
+        badge.className = 'card-uptime';
+        return;
+      }
+
+      const upCount = history.filter(h => h.status === 'up').length;
+      const pct = Math.round((upCount / history.length) * 100);
+      badge.textContent = `${pct}%`;
+      badge.className = `card-uptime ${pct === 100 ? 'perfect' : pct >= 90 ? 'good' : pct >= 50 ? 'warn' : 'bad'}`;
+    }
+
+    // Fetch history for sparklines and uptime
+    async function fetchServiceHistories() {
+      const allServiceIds = [...SERVICE_GROUPS.core, ...SERVICE_GROUPS.databases, ...SERVICE_GROUPS.support];
+
+      for (const id of allServiceIds) {
+        try {
+          const res = await fetch(`/api/status/${id}`);
+          if (res.ok) {
+            const data = await res.json();
+            const history = data.history || [];
+            renderSparkline(`spark-${id}`, history);
+            updateUptimeBadge(id, history);
+          }
+        } catch (err) {
+          // Ignore errors for individual services
+        }
+      }
+    }
 
     // Update timestamp
     function updateLastUpdate() {
