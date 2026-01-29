@@ -65,9 +65,14 @@ function createApiRouter(storage, config, scheduler, healthChecker, broadcast, a
       return res.status(404).json({ error: 'Service not found' });
     }
 
+    // Filter out empty/invalid history entries
+    const cleanHistory = (serviceData?.history || []).filter(h => h && h.timestamp && h.status);
+
     res.json({
       config: serviceConfig,
-      ...serviceData
+      current: serviceData?.current,
+      history: cleanHistory,
+      metrics: serviceData?.metrics
     });
   });
 
@@ -78,11 +83,12 @@ function createApiRouter(storage, config, scheduler, healthChecker, broadcast, a
 
     for (const service of config.services) {
       const serviceData = data[service.id];
-      if (serviceData?.current?.metrics) {
+      // Metrics are stored at serviceData.metrics (separate from current/history)
+      if (serviceData?.metrics) {
         metrics[service.id] = {
           name: service.name,
           type: service.type,
-          ...serviceData.current.metrics
+          ...serviceData.metrics
         };
       }
     }

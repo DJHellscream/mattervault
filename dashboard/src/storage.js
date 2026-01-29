@@ -73,6 +73,28 @@ class Storage {
   getAllServices() {
     return this.load();
   }
+
+  /**
+   * Update only the metrics for a service (doesn't affect history)
+   */
+  updateServiceMetrics(serviceId, metrics) {
+    const data = this.load();
+
+    if (!data[serviceId]) {
+      data[serviceId] = { current: null, history: [], metrics: null };
+    }
+
+    data[serviceId].metrics = metrics;
+    this.save(data);
+  }
+
+  /**
+   * Get metrics for a service
+   */
+  getServiceMetrics(serviceId) {
+    const data = this.load();
+    return data[serviceId]?.metrics || null;
+  }
 }
 
 module.exports = { Storage };

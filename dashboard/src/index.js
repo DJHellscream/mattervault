@@ -46,8 +46,7 @@ async function runHealthCheck(service) {
   previousStatus[service.id] = result;
 
   // Get current metrics if available
-  const currentData = storage.getServiceData(service.id);
-  const metrics = currentData?.metrics || {};
+  const metrics = storage.getServiceMetrics(service.id) || {};
 
   // Evaluate alert rules
   const alerts = alerter.evaluate(service, result, metrics);
@@ -55,17 +54,14 @@ async function runHealthCheck(service) {
     await alerter.send(alerts);
   }
 
-  // Update storage with health status
-  storage.updateService(service.id, {
-    ...result,
-    metrics: currentData?.metrics // Preserve existing metrics
-  });
+  // Update storage with health status (metrics stored separately)
+  storage.updateService(service.id, result);
 
   // Broadcast to WebSocket clients
   broadcast({
     type: 'status',
     service: service.id,
-    data: { ...result, metrics: currentData?.metrics }
+    data: { ...result, metrics }
   });
 
   console.log(`[${service.id}] ${result.status} - ${result.responseTime}ms`);
@@ -84,19 +80,14 @@ async function runMetricsCollection(service) {
   try {
     const metrics = await metricsCollector.collect(service);
 
-    // Get current status
+    // Get current status for alerting
     const currentData = storage.getServiceData(service.id);
 
-    // Merge metrics with existing data
-    const updatedData = {
-      ...(currentData || {}),
-      metrics
-    };
-
-    storage.updateService(service.id, updatedData);
+    // Store metrics separately (doesn't affect history)
+    storage.updateServiceMetrics(service.id, metrics);
 
     // Evaluate alert rules with new metrics
-    const alerts = alerter.evaluate(service, currentData, metrics);
+    const alerts = alerter.evaluate(service, currentData?.current, metrics);
     if (alerts.length > 0) {
       await alerter.send(alerts);
     }

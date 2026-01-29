@@ -588,20 +588,27 @@
     function renderHistoryBar(history) {
       const bar = document.getElementById('modalHistoryBar');
 
-      if (!history.length) {
+      // Filter out empty/invalid history entries
+      const validHistory = (history || []).filter(h => h && h.timestamp && h.status);
+
+      if (!validHistory.length) {
         bar.innerHTML = '<div class="history-segment unknown" style="flex:1"></div>';
         document.getElementById('historyStart').textContent = '--';
         document.getElementById('historyEnd').textContent = '--';
         return;
       }
 
-      const points = history.slice(-100);
-      bar.innerHTML = points.map(h =>
-        `<div class="history-segment ${h.status}" title="${new Date(h.timestamp).toLocaleString()}"></div>`
-      ).join('');
+      const points = validHistory.slice(-100);
+      bar.innerHTML = points.map(h => {
+        const date = new Date(h.timestamp);
+        const dateStr = isNaN(date.getTime()) ? 'Unknown' : date.toLocaleString();
+        return `<div class="history-segment ${h.status}" title="${dateStr}"></div>`;
+      }).join('');
 
-      document.getElementById('historyStart').textContent = new Date(points[0].timestamp).toLocaleTimeString();
-      document.getElementById('historyEnd').textContent = new Date(points[points.length - 1].timestamp).toLocaleTimeString();
+      const startDate = new Date(points[0].timestamp);
+      const endDate = new Date(points[points.length - 1].timestamp);
+      document.getElementById('historyStart').textContent = isNaN(startDate.getTime()) ? '--' : startDate.toLocaleTimeString();
+      document.getElementById('historyEnd').textContent = isNaN(endDate.getTime()) ? '--' : endDate.toLocaleTimeString();
     }
 
     function renderServiceMetrics(metrics, serviceType) {
@@ -722,11 +729,13 @@
 
       badge.textContent = recentQueriesData.length;
       list.innerHTML = recentQueriesData.slice(0, 5).map(q => {
-        const time = new Date(q.created_at).toLocaleTimeString();
+        const date = new Date(q.created_at);
+        const time = isNaN(date.getTime()) ? '--' : date.toLocaleTimeString();
         const queryPreview = q.query_text?.substring(0, 60) + (q.query_text?.length > 60 ? '...' : '');
+        const username = q.paperless_username || 'system';
         return `
           <div class="activity-item">
-            <div class="activity-user">${q.paperless_username || 'unknown'}</div>
+            <div class="activity-user">${username}</div>
             <div class="activity-query">${queryPreview || 'No query text'}</div>
             <div class="activity-meta">
               <span class="activity-family">${q.family_id || '--'}</span>
@@ -741,12 +750,16 @@
     // Sparkline charts for service cards
     function renderSparkline(elementId, history) {
       const container = document.getElementById(elementId);
-      if (!container || !history || history.length < 2) {
-        if (container) container.innerHTML = '';
+      if (!container) return;
+
+      // Filter valid history entries
+      const validHistory = (history || []).filter(h => h && h.responseTime !== undefined);
+      if (validHistory.length < 2) {
+        container.innerHTML = '';
         return;
       }
 
-      const times = history.slice(-20).map(h => h.responseTime || 0);
+      const times = validHistory.slice(-20).map(h => h.responseTime || 0);
       const max = Math.max(...times, 1);
       const width = container.offsetWidth || 100;
       const height = 24;
@@ -766,14 +779,16 @@
       const badge = document.getElementById(`uptime-${id}`);
       if (!badge) return;
 
-      if (!history || history.length === 0) {
+      // Filter valid history entries
+      const validHistory = (history || []).filter(h => h && h.status);
+      if (validHistory.length === 0) {
         badge.textContent = '--%';
         badge.className = 'card-uptime';
         return;
       }
 
-      const upCount = history.filter(h => h.status === 'up').length;
-      const pct = Math.round((upCount / history.length) * 100);
+      const upCount = validHistory.filter(h => h.status === 'up').length;
+      const pct = Math.round((upCount / validHistory.length) * 100);
       badge.textContent = `${pct}%`;
       badge.className = `card-uptime ${pct === 100 ? 'perfect' : pct >= 90 ? 'good' : pct >= 50 ? 'warn' : 'bad'}`;
     }
