@@ -1,0 +1,124 @@
+{
+  "services": [
+    {
+      "id": "redis",
+      "name": "Redis",
+      "type": "redis",
+      "host": "mattercache",
+      "port": 6379,
+      "interval": 30,
+      "timeout": 5000
+    },
+    {
+      "id": "db-paperless",
+      "name": "DB Paperless",
+      "type": "postgres",
+      "host": "matterdb-paperless",
+      "port": 5432,
+      "database": "paperless",
+      "user": "paperless",
+      "password": "${PAPERLESS_DB_PASS:-paperless_secure_pass}",
+      "interval": 30,
+      "timeout": 5000
+    },
+    {
+      "id": "db-n8n",
+      "name": "DB n8n",
+      "type": "postgres",
+      "host": "matterdb-n8n",
+      "port": 5432,
+      "database": "n8n",
+      "user": "n8n",
+      "password": "${N8N_DB_PASS:-n8n_secure_pass}",
+      "interval": 30,
+      "timeout": 5000
+    },
+    {
+      "id": "db-chatui",
+      "name": "DB ChatUI",
+      "type": "postgres",
+      "host": "matterdb-chatui",
+      "port": 5432,
+      "database": "chatui",
+      "user": "chatui",
+      "password": "${CHATUI_DB_PASS:-chatui_secure_pass}",
+      "interval": 30,
+      "timeout": 5000
+    },
+    {
+      "id": "gotenberg",
+      "name": "Gotenberg",
+      "type": "http",
+      "url": "http://matterconvert:3000/health",
+      "interval": 30,
+      "timeout": 5000
+    },
+    {
+      "id": "tika",
+      "name": "Tika",
+      "type": "http",
+      "url": "http://matterparse:9998/",
+      "interval": 30,
+      "timeout": 5000
+    },
+    {
+      "id": "paperless",
+      "name": "Paperless",
+      "type": "paperless",
+      "url": "http://mattervault:8000",
+      "interval": 30,
+      "timeout": 5000
+    },
+    {
+      "id": "qdrant",
+      "name": "Qdrant",
+      "type": "qdrant",
+      "url": "http://qdrant:6333",
+      "collection": "mattervault_documents_v2",
+      "interval": 30,
+      "timeout": 5000
+    },
+    {
+      "id": "n8n",
+      "name": "n8n",
+      "type": "http",
+      "url": "http://matterlogic:5678/healthz",
+      "interval": 30,
+      "timeout": 5000
+    },
+    {
+      "id": "chat-ui",
+      "name": "Chat UI",
+      "type": "chatui",
+      "url": "http://mattervault-chat:3000/health",
+      "interval": 30,
+      "timeout": 5000
+    },
+    {
+      "id": "ollama",
+      "name": "Ollama",
+      "type": "http",
+      "url": "http://host.docker.internal:11434/api/tags",
+      "interval": 30,
+      "timeout": 10000
+    },
+    {
+      "id": "docling",
+      "name": "Docling",
+      "type": "http",
+      "url": "http://host.docker.internal:5001/health",
+      "interval": 30,
+      "timeout": 10000
+    }
+  ],
+  "alerts": {
+    "enabled": true,
+    "transports": ["console", "file"],
+    "cooldownMinutes": 5
+  },
+  "intervals": {
+    "healthCheck": 30,
+    "metricsCollection": 60
+  },
+  "historyRetentionHours": 24
+}

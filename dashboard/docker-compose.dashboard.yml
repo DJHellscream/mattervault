@@ -3,18 +3,17 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.dashboard
+    container_name: mattervault-dashboard
     ports:
-      - "3005:3000"
+      - "3006:3000"
     volumes:
       - ./data:/app/data
-      - ./config.json:/app/config.json
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped
     networks:
-      - mattervault
+      - mattervault_matternet
 
 networks:
-  mattervault:
+  mattervault_matternet:
     external: true
-    name: mattervault_matternet

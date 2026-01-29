@@ -1,9 +1,9 @@
 const express = require('express');
 
-function createApiRouter(storage, config, scheduler, healthChecker, broadcast) {
+function createApiRouter(storage, config, scheduler, healthChecker, broadcast, alerter) {
   const router = express.Router();
 
-  // GET /api/status - all services status
+  // GET /api/status - all services status with metrics
   router.get('/status', (req, res) => {
     const data = storage.getAllServices();
     const services = {};
@@ -13,11 +13,20 @@ function createApiRouter(storage, config, scheduler, healthChecker, broadcast) {
     for (const service of config.services) {
       const serviceData = data[service.id];
       if (serviceData && serviceData.current) {
-        services[service.id] = serviceData.current;
+        services[service.id] = {
+          ...serviceData.current,
+          name: service.name,
+          type: service.type
+        };
         if (serviceData.current.status === 'up') up++;
         else down++;
       } else {
-        services[service.id] = { status: 'unknown', lastCheck: null };
+        services[service.id] = {
+          status: 'unknown',
+          lastCheck: null,
+          name: service.name,
+          type: service.type
+        };
       }
     }
 
@@ -27,18 +36,73 @@ function createApiRouter(storage, config, scheduler, healthChecker, broadcast) {
     });
   });
 
-  // GET /api/status/:serviceId - single service with history
+  // GET /api/status/:serviceId - single service with history and metrics
   router.get('/status/:serviceId', (req, res) => {
     const serviceData = storage.getServiceData(req.params.serviceId);
-    if (!serviceData) {
+    const serviceConfig = config.services.find(s => s.id === req.params.serviceId);
+
+    if (!serviceData && !serviceConfig) {
       return res.status(404).json({ error: 'Service not found' });
     }
-    res.json(serviceData);
+
+    res.json({
+      config: serviceConfig,
+      ...serviceData
+    });
+  });
+
+  // GET /api/metrics - all metrics summary
+  router.get('/metrics', (req, res) => {
+    const data = storage.getAllServices();
+    const metrics = {};
+
+    for (const service of config.services) {
+      const serviceData = data[service.id];
+      if (serviceData?.current?.metrics) {
+        metrics[service.id] = {
+          name: service.name,
+          type: service.type,
+          ...serviceData.current.metrics
+        };
+      }
+    }
+
+    // Calculate summary metrics
+    const qdrantMetrics = metrics['qdrant'] || {};
+    const paperlessMetrics = metrics['paperless'] || {};
+    const chatUIMetrics = metrics['chat-ui'] || {};
+
+    res.json({
+      services: metrics,
+      summary: {
+        total_vectors: qdrantMetrics.vector_count || 0,
+        total_documents: paperlessMetrics.document_count || 0,
+        total_conversations: chatUIMetrics.conversation_count || 0,
+        total_messages: chatUIMetrics.message_count || 0,
+        vectors_by_family: qdrantMetrics.vectors_by_family || {},
+        documents_by_family: paperlessMetrics.documents_by_family || {}
+      }
+    });
+  });
+
+  // GET /api/alerts - recent alerts
+  router.get('/alerts', (req, res) => {
+    const limit = parseInt(req.query.limit) || 50;
+    const alerts = alerter ? alerter.getRecentAlerts(limit) : [];
+    res.json({ alerts });
   });
 
   // GET /api/config - current configuration
   router.get('/config', (req, res) => {
-    res.json(config);
+    // Don't expose passwords
+    const safeConfig = {
+      ...config,
+      services: config.services.map(s => {
+        const { password, ...safe } = s;
+        return safe;
+      })
+    };
+    res.json(safeConfig);
   });
 
   // PUT /api/config/services/:serviceId - update service config
