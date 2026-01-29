@@ -9,17 +9,13 @@
 - SQL sanitization/escaping
 - E2E test infrastructure
 - CLAUDE.md documentation update
+- Admin UI for audit logs (with role sync from Paperless)
 
 ---
 
 ## Potential Next Steps
 
 ### Features
-
-**Admin UI for Audit Logs**
-- Simple page in chat-ui to view/search/export audit logs
-- API already exists (`/api/audit/export`, `/api/audit/summary`)
-- Would allow admins to review queries without using curl
 
 **Email Alerting**
 - Send alerts via email when services go down
@@ -38,12 +34,13 @@
 - Proper secrets management (not .env files)
 - Rate limiting on chat API
 
-### Performance
+### Data Integrity
 
-**Caching Layer**
-- Redis cache for frequent/repeated queries
-- Could skip LLM for identical questions within time window
-- Trade-off: freshness vs speed
+**Document Change/Delete Sync**
+- When documents are modified in Paperless, re-ingest to update vectors
+- When documents are deleted in Paperless, remove from Qdrant
+- Paperless webhooks can trigger n8n workflows for sync
+- Critical for keeping vector store consistent with source of truth
 
 ### Polish
 
@@ -58,12 +55,11 @@
 
 | Task | Effort | Impact | Dependencies |
 |------|--------|--------|--------------|
-| Admin UI for audit | Medium | Medium | None |
 | Email alerting | Low | High | SMTP config |
 | Per-family access | High | Medium | Paperless permissions setup |
 | Production hardening | Medium | High | Domain, certs |
-| Caching layer | Medium | Medium | Query patterns analysis |
-| Mobile chat UI | Medium | Low | Design decisions |
+| Document change/delete sync | Medium | High | Paperless webhook config |
+| Mobile chat UI | Medium | Medium | Design decisions |
 
 ---
 
@@ -73,6 +69,15 @@
 - Qdrant vectors + PostgreSQL dumps
 - Deferred because Mac Studio deployment will use machine-level imaging (Time Machine/APFS snapshots)
 - Revisit if off-site backups or selective restore needed
+
+---
+
+## Not Planned
+
+**Query Caching** *(decided 2026-01-29)*
+- Redis cache for repeated queries to skip LLM
+- Not implementing: documents can change in Paperless at any time, cached answers could be stale/wrong
+- Freshness and accuracy more important than speed for legal document queries
 
 ---
 
