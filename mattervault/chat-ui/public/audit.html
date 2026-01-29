@@ -1,0 +1,1323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Audit Logs - Mattervault Admin</title>
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    /* Page-specific layout */
+    .audit-page {
+      position: relative;
+      z-index: 1;
+      min-height: 100vh;
+      padding: 32px;
+      max-width: 1600px;
+      margin: 0 auto;
+    }
+
+    /* Header */
+    .audit-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      animation: fadeSlideDown 0.5s ease-out;
+    }
+
+    .audit-title {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .audit-title .brand-label {
+      font-size: 0.7rem;
+      font-weight: 500;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    .audit-title h1 {
+      font-size: 2rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      background: linear-gradient(135deg, var(--text-primary) 0%, var(--text-secondary) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .audit-title .admin-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--accent-teal);
+      background: rgba(0, 212, 170, 0.1);
+      border: 1px solid rgba(0, 212, 170, 0.2);
+      padding: 4px 10px;
+      border-radius: 6px;
+      width: fit-content;
+      margin-top: 8px;
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .back-link {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 0.9rem;
+      padding: 10px 16px;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      transition: all 0.2s ease;
+    }
+
+    .back-link:hover {
+      background: rgba(0, 0, 0, 0.5);
+      color: var(--text-primary);
+      border-color: var(--border-glow);
+    }
+
+    /* Stats grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 32px;
+      animation: fadeSlideUp 0.5s ease-out 0.1s backwards;
+    }
+
+    .stat-card {
+      background: var(--bg-surface);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      padding: 20px 24px;
+      transition: all 0.2s ease;
+    }
+
+    .stat-card:hover {
+      border-color: var(--border-glow);
+      transform: translateY(-2px);
+    }
+
+    .stat-label {
+      font-size: 0.75rem;
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    .stat-value {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1.8rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .stat-value.teal { color: var(--accent-teal); }
+    .stat-value.blue { color: var(--accent-blue); }
+
+    .stat-sub {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      margin-top: 4px;
+    }
+
+    /* Filters section */
+    .filters-section {
+      background: var(--bg-surface);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      padding: 20px 24px;
+      margin-bottom: 24px;
+      animation: fadeSlideUp 0.5s ease-out 0.2s backwards;
+    }
+
+    .filters-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      align-items: flex-end;
+    }
+
+    .filter-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-width: 160px;
+    }
+
+    .filter-group label {
+      font-size: 0.75rem;
+      font-weight: 500;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    .filter-group input,
+    .filter-group select {
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-family: 'Outfit', sans-serif;
+      font-size: 0.9rem;
+      color: var(--text-primary);
+      transition: all 0.2s ease;
+    }
+
+    .filter-group input:focus,
+    .filter-group select:focus {
+      outline: none;
+      border-color: var(--accent-blue);
+      box-shadow: 0 0 0 3px rgba(77, 166, 255, 0.1);
+    }
+
+    .filter-group input::placeholder {
+      color: var(--text-muted);
+    }
+
+    .filter-group input[type="date"] {
+      color-scheme: dark;
+    }
+
+    .filter-actions {
+      display: flex;
+      gap: 10px;
+      margin-left: auto;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 18px;
+      border-radius: 10px;
+      font-family: 'Outfit', sans-serif;
+      font-size: 0.9rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      border: none;
+    }
+
+    .btn-primary {
+      background: var(--accent-teal);
+      color: var(--bg-deep);
+    }
+
+    .btn-primary:hover {
+      background: #00e6b8;
+      transform: translateY(-1px);
+    }
+
+    .btn-secondary {
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-secondary);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(0, 0, 0, 0.5);
+      color: var(--text-primary);
+    }
+
+    .btn-export {
+      background: rgba(77, 166, 255, 0.1);
+      border: 1px solid rgba(77, 166, 255, 0.2);
+      color: var(--accent-blue);
+    }
+
+    .btn-export:hover {
+      background: rgba(77, 166, 255, 0.2);
+      border-color: rgba(77, 166, 255, 0.4);
+    }
+
+    /* Logs table */
+    .logs-section {
+      background: var(--bg-surface);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      overflow: hidden;
+      animation: fadeSlideUp 0.5s ease-out 0.3s backwards;
+    }
+
+    .logs-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .logs-header h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .logs-count {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .logs-table-wrapper {
+      overflow-x: auto;
+    }
+
+    .logs-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .logs-table th {
+      text-align: left;
+      padding: 14px 16px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      background: rgba(0, 0, 0, 0.2);
+      border-bottom: 1px solid var(--border-subtle);
+      white-space: nowrap;
+    }
+
+    .logs-table td {
+      padding: 14px 16px;
+      font-size: 0.9rem;
+      color: var(--text-primary);
+      border-bottom: 1px solid rgba(100, 120, 160, 0.08);
+      vertical-align: top;
+    }
+
+    .logs-table tr:hover td {
+      background: rgba(0, 0, 0, 0.15);
+    }
+
+    .logs-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    /* Cell styles */
+    .cell-timestamp {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      white-space: nowrap;
+    }
+
+    .cell-user {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .cell-user .username {
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+
+    .cell-family {
+      display: inline-block;
+      background: rgba(77, 166, 255, 0.1);
+      color: var(--accent-blue);
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      font-weight: 500;
+    }
+
+    .cell-query {
+      max-width: 400px;
+      line-height: 1.5;
+    }
+
+    .cell-query .query-text {
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      color: var(--text-primary);
+    }
+
+    .cell-query .response-preview {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+      display: -webkit-box;
+      -webkit-line-clamp: 1;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .cell-latency {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+    }
+
+    .cell-latency.fast { color: var(--accent-teal); }
+    .cell-latency.medium { color: #f0b429; }
+    .cell-latency.slow { color: var(--accent-error); }
+
+    .cell-actions {
+      white-space: nowrap;
+    }
+
+    .view-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 6px 10px;
+      background: rgba(0, 212, 170, 0.1);
+      border: 1px solid rgba(0, 212, 170, 0.2);
+      border-radius: 6px;
+      color: var(--accent-teal);
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .view-btn:hover {
+      background: rgba(0, 212, 170, 0.2);
+      border-color: rgba(0, 212, 170, 0.4);
+    }
+
+    /* Pagination */
+    .pagination {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 24px;
+      border-top: 1px solid var(--border-subtle);
+    }
+
+    .pagination-info {
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+    }
+
+    .pagination-controls {
+      display: flex;
+      gap: 8px;
+    }
+
+    .page-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 36px;
+      height: 36px;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .page-btn:hover:not(:disabled) {
+      background: rgba(0, 0, 0, 0.5);
+      color: var(--text-primary);
+    }
+
+    .page-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    /* Empty state */
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 60px 20px;
+      text-align: center;
+      color: var(--text-muted);
+    }
+
+    .empty-state svg {
+      opacity: 0.4;
+      margin-bottom: 16px;
+    }
+
+    .empty-state p {
+      font-size: 0.95rem;
+    }
+
+    /* Detail modal */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.8);
+      backdrop-filter: blur(4px);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .detail-modal {
+      background: var(--bg-surface);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--border-subtle);
+      border-radius: 20px;
+      max-width: 800px;
+      width: 100%;
+      max-height: 90vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      animation: modalAppear 0.3s ease-out;
+    }
+
+    @keyframes modalAppear {
+      from {
+        opacity: 0;
+        transform: scale(0.95) translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+      }
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .modal-header h3 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .modal-close {
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: var(--text-secondary);
+      transition: all 0.2s ease;
+    }
+
+    .modal-close:hover {
+      background: rgba(255, 92, 114, 0.1);
+      border-color: rgba(255, 92, 114, 0.3);
+      color: var(--accent-error);
+    }
+
+    .modal-body {
+      padding: 24px;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 20px;
+      margin-bottom: 24px;
+    }
+
+    .detail-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .detail-label {
+      font-size: 0.7rem;
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    .detail-value {
+      font-size: 0.95rem;
+      color: var(--text-primary);
+      word-break: break-word;
+    }
+
+    .detail-value.mono {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+    }
+
+    .detail-section {
+      margin-bottom: 24px;
+    }
+
+    .detail-section h4 {
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--text-secondary);
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .detail-text {
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      padding: 16px;
+      font-size: 0.9rem;
+      line-height: 1.6;
+      color: var(--text-primary);
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    /* Loading state */
+    .loading-overlay {
+      display: none;
+      position: absolute;
+      inset: 0;
+      background: rgba(10, 14, 26, 0.8);
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+    }
+
+    .loading-overlay.active {
+      display: flex;
+    }
+
+    .loading-spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid var(--border-subtle);
+      border-top-color: var(--accent-teal);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Access denied */
+    .access-denied {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 60vh;
+      text-align: center;
+      animation: fadeSlideUp 0.5s ease-out;
+    }
+
+    .access-denied svg {
+      color: var(--accent-error);
+      opacity: 0.6;
+      margin-bottom: 24px;
+    }
+
+    .access-denied h2 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 8px;
+    }
+
+    .access-denied p {
+      color: var(--text-secondary);
+      margin-bottom: 24px;
+    }
+
+    /* Responsive */
+    @media (max-width: 1024px) {
+      .audit-page {
+        padding: 24px 16px;
+      }
+
+      .filters-row {
+        flex-direction: column;
+      }
+
+      .filter-group {
+        width: 100%;
+      }
+
+      .filter-actions {
+        margin-left: 0;
+        width: 100%;
+        justify-content: flex-end;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .audit-header {
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .header-actions {
+        width: 100%;
+      }
+
+      .back-link {
+        flex: 1;
+        justify-content: center;
+      }
+
+      .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .logs-table th:nth-child(4),
+      .logs-table td:nth-child(4) {
+        display: none;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .stats-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .detail-modal {
+        max-height: 100vh;
+        border-radius: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="audit-page" id="auditPage">
+    <!-- Loading overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+      <div class="loading-spinner"></div>
+    </div>
+
+    <!-- Access denied state (hidden by default) -->
+    <div class="access-denied" id="accessDenied" style="display: none;">
+      <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+      </svg>
+      <h2>Access Denied</h2>
+      <p>You need administrator privileges to view audit logs.</p>
+      <a href="/" class="btn btn-primary">Return to Chat</a>
+    </div>
+
+    <!-- Main content (hidden until auth check) -->
+    <div id="mainContent" style="display: none;">
+      <!-- Header -->
+      <header class="audit-header">
+        <div class="audit-title">
+          <div class="brand-label">Mattervault Admin</div>
+          <h1>Audit Logs</h1>
+          <div class="admin-badge">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            </svg>
+            <span>Admin Access</span>
+          </div>
+        </div>
+        <div class="header-actions">
+          <a href="/" class="back-link">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M19 12H5M12 19l-7-7 7-7"/>
+            </svg>
+            Back to Chat
+          </a>
+        </div>
+      </header>
+
+      <!-- Stats -->
+      <div class="stats-grid" id="statsGrid">
+        <div class="stat-card">
+          <div class="stat-label">Total Queries</div>
+          <div class="stat-value teal" id="statTotalQueries">--</div>
+          <div class="stat-sub">All time</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Unique Users</div>
+          <div class="stat-value" id="statUniqueUsers">--</div>
+          <div class="stat-sub">Last 30 days</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Families Queried</div>
+          <div class="stat-value blue" id="statFamilies">--</div>
+          <div class="stat-sub">Last 30 days</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Avg Latency</div>
+          <div class="stat-value" id="statAvgLatency">--</div>
+          <div class="stat-sub">Last 30 days</div>
+        </div>
+      </div>
+
+      <!-- Filters -->
+      <div class="filters-section">
+        <div class="filters-row">
+          <div class="filter-group">
+            <label>Start Date</label>
+            <input type="date" id="filterStartDate">
+          </div>
+          <div class="filter-group">
+            <label>End Date</label>
+            <input type="date" id="filterEndDate">
+          </div>
+          <div class="filter-group">
+            <label>Family</label>
+            <select id="filterFamily">
+              <option value="">All Families</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label>Username</label>
+            <input type="text" id="filterUsername" placeholder="Search user...">
+          </div>
+          <div class="filter-actions">
+            <button class="btn btn-secondary" id="clearFiltersBtn">Clear</button>
+            <button class="btn btn-primary" id="applyFiltersBtn">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"/>
+                <path d="M21 21l-4.35-4.35"/>
+              </svg>
+              Search
+            </button>
+            <button class="btn btn-export" id="exportBtn">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+              Export JSONL
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Logs table -->
+      <div class="logs-section">
+        <div class="logs-header">
+          <h2>Query History</h2>
+          <div class="logs-count" id="logsCount">Loading...</div>
+        </div>
+
+        <div class="logs-table-wrapper">
+          <table class="logs-table">
+            <thead>
+              <tr>
+                <th>Timestamp</th>
+                <th>User</th>
+                <th>Family</th>
+                <th>Query</th>
+                <th>Latency</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="logsTableBody">
+              <!-- Populated by JS -->
+            </tbody>
+          </table>
+        </div>
+
+        <div class="empty-state" id="emptyState" style="display: none;">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="12" y1="18" x2="12" y2="12"/>
+            <line x1="9" y1="15" x2="15" y2="15"/>
+          </svg>
+          <p>No audit logs found for the selected filters.</p>
+        </div>
+
+        <div class="pagination" id="pagination">
+          <div class="pagination-info" id="paginationInfo">Showing 0 of 0</div>
+          <div class="pagination-controls">
+            <button class="page-btn" id="prevPageBtn" disabled>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M15 18l-6-6 6-6"/>
+              </svg>
+            </button>
+            <button class="page-btn" id="nextPageBtn" disabled>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 18l6-6-6-6"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Detail modal -->
+  <div class="modal-overlay" id="detailModal">
+    <div class="detail-modal">
+      <div class="modal-header">
+        <h3>Query Details</h3>
+        <button class="modal-close" id="closeModalBtn">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body" id="modalBody">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // State
+    let accessToken = null;
+    let currentUser = null;
+    let currentOffset = 0;
+    const pageSize = 50;
+    let totalLogs = 0;
+
+    // Elements
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    const accessDenied = document.getElementById('accessDenied');
+    const mainContent = document.getElementById('mainContent');
+    const logsTableBody = document.getElementById('logsTableBody');
+    const emptyState = document.getElementById('emptyState');
+    const logsCount = document.getElementById('logsCount');
+    const paginationInfo = document.getElementById('paginationInfo');
+    const prevPageBtn = document.getElementById('prevPageBtn');
+    const nextPageBtn = document.getElementById('nextPageBtn');
+    const detailModal = document.getElementById('detailModal');
+    const modalBody = document.getElementById('modalBody');
+
+    // Filter elements
+    const filterStartDate = document.getElementById('filterStartDate');
+    const filterEndDate = document.getElementById('filterEndDate');
+    const filterFamily = document.getElementById('filterFamily');
+    const filterUsername = document.getElementById('filterUsername');
+
+    // Initialize
+    async function init() {
+      // Check auth
+      accessToken = localStorage.getItem('accessToken') || sessionStorage.getItem('accessToken');
+      const userStr = localStorage.getItem('user') || sessionStorage.getItem('user');
+
+      if (!accessToken || !userStr) {
+        window.location.href = '/login.html';
+        return;
+      }
+
+      currentUser = JSON.parse(userStr);
+
+      // Check admin role
+      if (currentUser.role !== 'admin') {
+        loadingOverlay.classList.remove('active');
+        accessDenied.style.display = 'flex';
+        return;
+      }
+
+      // Show main content
+      mainContent.style.display = 'block';
+
+      // Set default date range (last 30 days)
+      const today = new Date();
+      const thirtyDaysAgo = new Date(today - 30 * 24 * 60 * 60 * 1000);
+      filterEndDate.value = today.toISOString().split('T')[0];
+      filterStartDate.value = thirtyDaysAgo.toISOString().split('T')[0];
+
+      // Load data
+      await Promise.all([
+        loadStats(),
+        loadFamilies(),
+        loadLogs()
+      ]);
+
+      loadingOverlay.classList.remove('active');
+    }
+
+    // API helper
+    async function api(endpoint, options = {}) {
+      const res = await fetch(endpoint, {
+        ...options,
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+          ...options.headers
+        }
+      });
+
+      if (res.status === 401) {
+        window.location.href = '/login.html';
+        return null;
+      }
+
+      if (res.status === 403) {
+        accessDenied.style.display = 'flex';
+        mainContent.style.display = 'none';
+        return null;
+      }
+
+      return res;
+    }
+
+    // Load summary stats
+    async function loadStats() {
+      try {
+        const res = await api('/api/audit/summary?group_by=month');
+        if (!res) return;
+
+        const data = await res.json();
+
+        // Calculate totals from monthly data
+        let totalQueries = 0;
+        let uniqueUsers = new Set();
+        let uniqueFamilies = new Set();
+        let totalLatency = 0;
+        let latencyCount = 0;
+
+        // Get user summary for unique users
+        const userRes = await api('/api/audit/summary?group_by=user');
+        if (userRes) {
+          const userData = await userRes.json();
+          document.getElementById('statUniqueUsers').textContent = userData.data.length;
+        }
+
+        // Get family summary
+        const familyRes = await api('/api/audit/summary?group_by=family');
+        if (familyRes) {
+          const familyData = await familyRes.json();
+          document.getElementById('statFamilies').textContent = familyData.data.length;
+
+          // Calculate average latency across families
+          let totalLatency = 0;
+          let totalQueries = 0;
+          familyData.data.forEach(f => {
+            totalQueries += parseInt(f.query_count);
+            totalLatency += parseInt(f.avg_latency_ms || 0) * parseInt(f.query_count);
+          });
+
+          document.getElementById('statTotalQueries').textContent = totalQueries.toLocaleString();
+          if (totalQueries > 0) {
+            const avgLatency = Math.round(totalLatency / totalQueries);
+            document.getElementById('statAvgLatency').textContent = `${avgLatency}ms`;
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load stats:', err);
+      }
+    }
+
+    // Load families for filter dropdown
+    async function loadFamilies() {
+      try {
+        const res = await api('/api/auth/families');
+        if (!res) return;
+
+        const data = await res.json();
+        const select = document.getElementById('filterFamily');
+
+        data.families.forEach(f => {
+          const option = document.createElement('option');
+          option.value = f.slug || f.name.toLowerCase();
+          option.textContent = f.name;
+          select.appendChild(option);
+        });
+      } catch (err) {
+        console.error('Failed to load families:', err);
+      }
+    }
+
+    // Load audit logs
+    async function loadLogs() {
+      try {
+        const params = new URLSearchParams({
+          limit: pageSize,
+          offset: currentOffset
+        });
+
+        if (filterStartDate.value) params.append('start_date', filterStartDate.value);
+        if (filterEndDate.value) params.append('end_date', filterEndDate.value + 'T23:59:59');
+        if (filterFamily.value) params.append('family_id', filterFamily.value);
+        if (filterUsername.value) params.append('username', filterUsername.value);
+
+        const res = await api(`/api/audit/recent?${params}`);
+        if (!res) return;
+
+        const data = await res.json();
+        totalLogs = data.pagination.total;
+
+        renderLogs(data.logs);
+        updatePagination(data.pagination);
+      } catch (err) {
+        console.error('Failed to load logs:', err);
+        logsTableBody.innerHTML = '';
+        emptyState.style.display = 'flex';
+      }
+    }
+
+    // Render logs table
+    function renderLogs(logs) {
+      if (logs.length === 0) {
+        logsTableBody.innerHTML = '';
+        emptyState.style.display = 'flex';
+        document.querySelector('.logs-table').style.display = 'none';
+        return;
+      }
+
+      emptyState.style.display = 'none';
+      document.querySelector('.logs-table').style.display = 'table';
+
+      logsTableBody.innerHTML = logs.map(log => {
+        const timestamp = new Date(log.created_at);
+        const timeStr = timestamp.toLocaleDateString() + ' ' + timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+        const latency = parseInt(log.total_latency_ms) || 0;
+        let latencyClass = 'fast';
+        if (latency > 5000) latencyClass = 'slow';
+        else if (latency > 2000) latencyClass = 'medium';
+
+        const queryPreview = (log.query_text || '').substring(0, 100);
+        const responsePreview = (log.response_text || '').substring(0, 80);
+
+        return `
+          <tr>
+            <td class="cell-timestamp">${timeStr}</td>
+            <td class="cell-user">
+              <span class="username">${log.paperless_username || 'system'}</span>
+            </td>
+            <td><span class="cell-family">${log.family_id || 'N/A'}</span></td>
+            <td class="cell-query">
+              <div class="query-text">${escapeHtml(queryPreview)}${log.query_text?.length > 100 ? '...' : ''}</div>
+              ${responsePreview ? `<div class="response-preview">${escapeHtml(responsePreview)}...</div>` : ''}
+            </td>
+            <td class="cell-latency ${latencyClass}">${latency.toLocaleString()}ms</td>
+            <td class="cell-actions">
+              <button class="view-btn" onclick="viewDetail('${log.correlation_id}')">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+                View
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // Update pagination
+    function updatePagination(pagination) {
+      const start = pagination.offset + 1;
+      const end = Math.min(pagination.offset + pagination.limit, pagination.total);
+
+      logsCount.textContent = `${pagination.total.toLocaleString()} total`;
+      paginationInfo.textContent = `Showing ${start}-${end} of ${pagination.total.toLocaleString()}`;
+
+      prevPageBtn.disabled = pagination.offset === 0;
+      nextPageBtn.disabled = !pagination.has_more;
+    }
+
+    // View detail modal
+    async function viewDetail(correlationId) {
+      try {
+        const res = await api(`/api/audit/query/${correlationId}`);
+        if (!res) return;
+
+        const data = await res.json();
+        const log = data.audit_log;
+
+        const timestamp = new Date(log.created_at);
+
+        modalBody.innerHTML = `
+          <div class="detail-grid">
+            <div class="detail-item">
+              <div class="detail-label">Timestamp</div>
+              <div class="detail-value">${timestamp.toLocaleString()}</div>
+            </div>
+            <div class="detail-item">
+              <div class="detail-label">User</div>
+              <div class="detail-value">${log.paperless_username || 'system'}</div>
+            </div>
+            <div class="detail-item">
+              <div class="detail-label">Family</div>
+              <div class="detail-value">${log.family_id || 'N/A'}</div>
+            </div>
+            <div class="detail-item">
+              <div class="detail-label">Latency</div>
+              <div class="detail-value">${(log.total_latency_ms || 0).toLocaleString()}ms</div>
+            </div>
+            <div class="detail-item">
+              <div class="detail-label">Correlation ID</div>
+              <div class="detail-value mono">${log.correlation_id || 'N/A'}</div>
+            </div>
+            <div class="detail-item">
+              <div class="detail-label">n8n Execution</div>
+              <div class="detail-value mono">${log.n8n_execution_id || 'N/A'}</div>
+            </div>
+          </div>
+
+          <div class="detail-section">
+            <h4>User Query</h4>
+            <div class="detail-text">${escapeHtml(log.query_text || 'No query text')}</div>
+          </div>
+
+          <div class="detail-section">
+            <h4>Assistant Response</h4>
+            <div class="detail-text">${escapeHtml(log.response_text || 'No response text')}</div>
+          </div>
+
+          ${log.documents_cited ? `
+            <div class="detail-section">
+              <h4>Documents Cited</h4>
+              <div class="detail-text">${escapeHtml(JSON.stringify(log.documents_cited, null, 2))}</div>
+            </div>
+          ` : ''}
+        `;
+
+        detailModal.classList.add('active');
+      } catch (err) {
+        console.error('Failed to load detail:', err);
+      }
+    }
+
+    // Export logs
+    async function exportLogs() {
+      const startDate = filterStartDate.value || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      const endDate = filterEndDate.value || new Date().toISOString().split('T')[0];
+
+      const params = new URLSearchParams({
+        start_date: startDate,
+        end_date: endDate + 'T23:59:59'
+      });
+
+      if (filterFamily.value) params.append('family_id', filterFamily.value);
+      if (filterUsername.value) params.append('user_id', filterUsername.value);
+
+      // Create a download link
+      const url = `/api/audit/export?${params}`;
+
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `audit-export-${startDate}-to-${endDate}.jsonl`;
+
+      // Add auth header by fetching and creating blob
+      try {
+        const res = await api(url);
+        if (!res) return;
+
+        const blob = await res.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        a.href = blobUrl;
+        a.click();
+        URL.revokeObjectURL(blobUrl);
+      } catch (err) {
+        console.error('Export failed:', err);
+      }
+    }
+
+    // Escape HTML
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // Event listeners
+    document.getElementById('applyFiltersBtn').addEventListener('click', () => {
+      currentOffset = 0;
+      loadLogs();
+    });
+
+    document.getElementById('clearFiltersBtn').addEventListener('click', () => {
+      const today = new Date();
+      const thirtyDaysAgo = new Date(today - 30 * 24 * 60 * 60 * 1000);
+      filterEndDate.value = today.toISOString().split('T')[0];
+      filterStartDate.value = thirtyDaysAgo.toISOString().split('T')[0];
+      filterFamily.value = '';
+      filterUsername.value = '';
+      currentOffset = 0;
+      loadLogs();
+    });
+
+    document.getElementById('exportBtn').addEventListener('click', exportLogs);
+
+    prevPageBtn.addEventListener('click', () => {
+      if (currentOffset >= pageSize) {
+        currentOffset -= pageSize;
+        loadLogs();
+      }
+    });
+
+    nextPageBtn.addEventListener('click', () => {
+      currentOffset += pageSize;
+      loadLogs();
+    });
+
+    document.getElementById('closeModalBtn').addEventListener('click', () => {
+      detailModal.classList.remove('active');
+    });
+
+    detailModal.addEventListener('click', (e) => {
+      if (e.target === detailModal) {
+        detailModal.classList.remove('active');
+      }
+    });
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && detailModal.classList.contains('active')) {
+        detailModal.classList.remove('active');
+      }
+    });
+
+    // Enter key on filters
+    filterUsername.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        currentOffset = 0;
+        loadLogs();
+      }
+    });
+
+    // Start
+    init();
+  </script>
+</body>
+</html>

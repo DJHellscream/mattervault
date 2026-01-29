@@ -33,11 +33,6 @@
 
 ### Operations
 
-**Backup Scripts**
-- Automated backup for Qdrant vectors
-- PostgreSQL dump for chatui database (conversations, audit logs)
-- Could run on schedule via n8n or cron
-
 **Production Hardening**
 - HTTPS/TLS termination (nginx or traefik)
 - Proper secrets management (not .env files)
@@ -66,10 +61,18 @@
 | Admin UI for audit | Medium | Medium | None |
 | Email alerting | Low | High | SMTP config |
 | Per-family access | High | Medium | Paperless permissions setup |
-| Backup scripts | Low | High | Storage location |
 | Production hardening | Medium | High | Domain, certs |
 | Caching layer | Medium | Medium | Query patterns analysis |
 | Mobile chat UI | Medium | Low | Design decisions |
+
+---
+
+## Deferred to Production
+
+**Backup Scripts** *(deferred 2026-01-29)*
+- Qdrant vectors + PostgreSQL dumps
+- Deferred because Mac Studio deployment will use machine-level imaging (Time Machine/APFS snapshots)
+- Revisit if off-site backups or selective restore needed
 
 ---
 

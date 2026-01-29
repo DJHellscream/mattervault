@@ -134,16 +134,19 @@ async function syncUserFromPaperless(paperlessUser, paperlessToken) {
   );
 
   if (existingUsers.length > 0) {
-    // Update existing user with new token and sync time
+    // Update existing user with new token, sync time, AND role from Paperless
+    // This ensures admin status is always synced from Paperless on login
+    const role = paperlessUser.isSuperuser ? 'admin' : 'user';
     const { rows } = await db.query(
       `UPDATE users
        SET paperless_token = $1,
            paperless_username = $2,
            display_name = COALESCE($3, display_name),
+           role = $4,
            last_synced_at = NOW()
-       WHERE paperless_user_id = $4
+       WHERE paperless_user_id = $5
        RETURNING id, paperless_user_id, paperless_username, display_name, role, created_at`,
-      [paperlessToken, paperlessUser.username, paperlessUser.displayName, paperlessUser.id]
+      [paperlessToken, paperlessUser.username, paperlessUser.displayName, role, paperlessUser.id]
     );
     return rows[0];
   }

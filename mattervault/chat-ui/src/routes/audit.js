@@ -23,6 +23,97 @@ function requireAdmin(req, res, next) {
 }
 
 /**
+ * GET /api/audit/recent
+ * Get recent audit logs with pagination for the admin UI
+ * Query params: limit (default 50, max 200), offset (default 0), family_id, username
+ * Admin only
+ */
+router.get('/recent', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit) || 50, 200);
+    const offset = parseInt(req.query.offset) || 0;
+    const { family_id, username, start_date, end_date } = req.query;
+
+    // Build query with optional filters
+    let query = `
+      SELECT
+        id,
+        correlation_id,
+        paperless_username,
+        family_id,
+        query_text,
+        response_text,
+        total_latency_ms,
+        created_at
+      FROM audit.chat_query_logs
+      WHERE 1=1
+    `;
+    let countQuery = `SELECT COUNT(*) as total FROM audit.chat_query_logs WHERE 1=1`;
+    const params = [];
+    const countParams = [];
+    let paramIndex = 1;
+
+    if (family_id) {
+      query += ` AND family_id = $${paramIndex}`;
+      countQuery += ` AND family_id = $${paramIndex}`;
+      params.push(family_id);
+      countParams.push(family_id);
+      paramIndex++;
+    }
+
+    if (username) {
+      query += ` AND paperless_username ILIKE $${paramIndex}`;
+      countQuery += ` AND paperless_username ILIKE $${paramIndex}`;
+      params.push(`%${username}%`);
+      countParams.push(`%${username}%`);
+      paramIndex++;
+    }
+
+    if (start_date) {
+      query += ` AND created_at >= $${paramIndex}`;
+      countQuery += ` AND created_at >= $${paramIndex}`;
+      params.push(new Date(start_date).toISOString());
+      countParams.push(new Date(start_date).toISOString());
+      paramIndex++;
+    }
+
+    if (end_date) {
+      query += ` AND created_at < $${paramIndex}`;
+      countQuery += ` AND created_at < $${paramIndex}`;
+      params.push(new Date(end_date).toISOString());
+      countParams.push(new Date(end_date).toISOString());
+      paramIndex++;
+    }
+
+    query += ` ORDER BY created_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+    params.push(limit, offset);
+
+    // Execute both queries
+    const [logsResult, countResult] = await Promise.all([
+      db.query(query, params),
+      db.query(countQuery, countParams)
+    ]);
+
+    res.json({
+      logs: logsResult.rows,
+      pagination: {
+        total: parseInt(countResult.rows[0].total),
+        limit,
+        offset,
+        has_more: offset + logsResult.rows.length < parseInt(countResult.rows[0].total)
+      }
+    });
+
+  } catch (err) {
+    console.error('Recent logs error:', err);
+    res.status(500).json({
+      error: 'Failed to fetch recent logs',
+      code: 'SERVER_ERROR'
+    });
+  }
+});
+
+/**
  * GET /api/audit/export
  * Stream audit logs as JSONL for a date range
  * Query params: start_date, end_date (ISO 8601 format)
