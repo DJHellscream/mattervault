@@ -194,6 +194,7 @@ services:
       - n8n_data:/home/node/.n8n
       - D:\CCC\mattervault\intake:/files/intake:ro  # Triggers
       - D:\CCC\mattervault\paperless\consume:/files/paperless-consume  # Push files if needed
+      - ./audit-archives:/files/audit-archives  # Audit log archives (7-year retention)
     depends_on:
       - db-n8n
       - qdrant
