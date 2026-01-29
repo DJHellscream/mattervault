@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0a0e1a">
   <title>mattervault chat</title>
   <link rel="stylesheet" href="/style.css">
   <style>
@@ -1928,6 +1931,126 @@
         addMessage('error', `Failed to export: ${err.message}`);
       }
     }
+
+    // ==========================================================================
+    // MOBILE GESTURE SUPPORT
+    // Edge swipe to open sidebar, swipe left to close
+    // ==========================================================================
+    (function initMobileGestures() {
+      let touchStartX = 0;
+      let touchStartY = 0;
+      let touchCurrentX = 0;
+      let isSwiping = false;
+      const EDGE_THRESHOLD = 30; // px from left edge to trigger
+      const SWIPE_THRESHOLD = 80; // px to complete swipe
+      const VELOCITY_THRESHOLD = 0.5; // px/ms for quick swipe
+      let touchStartTime = 0;
+
+      // Check if we're on a touch device
+      const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+      if (!isTouchDevice) return;
+
+      // Only enable on mobile viewport
+      const isMobileViewport = () => window.innerWidth <= 900;
+
+      document.addEventListener('touchstart', (e) => {
+        if (!isMobileViewport()) return;
+
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+        touchStartTime = Date.now();
+        touchCurrentX = touchStartX;
+
+        // Check if starting from left edge (to open sidebar)
+        const sidebarOpen = sidebar.classList.contains('mobile-open');
+        if (!sidebarOpen && touchStartX < EDGE_THRESHOLD) {
+          isSwiping = true;
+          sidebar.style.transition = 'none';
+        }
+        // Check if sidebar is open (to close it)
+        else if (sidebarOpen) {
+          isSwiping = true;
+          sidebar.style.transition = 'none';
+        }
+      }, { passive: true });
+
+      document.addEventListener('touchmove', (e) => {
+        if (!isSwiping || !isMobileViewport()) return;
+
+        touchCurrentX = e.touches[0].clientX;
+        const deltaX = touchCurrentX - touchStartX;
+        const deltaY = e.touches[0].clientY - touchStartY;
+
+        // If scrolling vertically more than horizontally, cancel swipe
+        if (Math.abs(deltaY) > Math.abs(deltaX) * 1.5) {
+          isSwiping = false;
+          sidebar.style.transition = '';
+          return;
+        }
+
+        const sidebarOpen = sidebar.classList.contains('mobile-open');
+        const sidebarWidth = sidebar.offsetWidth;
+
+        if (!sidebarOpen && deltaX > 0) {
+          // Opening: translate from -100% towards 0
+          const progress = Math.min(deltaX / sidebarWidth, 1);
+          const translateX = -100 + (progress * 100);
+          sidebar.style.transform = `translateX(${translateX}%)`;
+          sidebarOverlay.style.opacity = progress * 0.6;
+          sidebarOverlay.style.visibility = 'visible';
+          sidebarOverlay.style.display = 'block';
+        } else if (sidebarOpen && deltaX < 0) {
+          // Closing: translate from 0 towards -100%
+          const progress = Math.min(Math.abs(deltaX) / sidebarWidth, 1);
+          const translateX = -progress * 100;
+          sidebar.style.transform = `translateX(${translateX}%)`;
+          sidebarOverlay.style.opacity = (1 - progress) * 0.6;
+        }
+      }, { passive: true });
+
+      document.addEventListener('touchend', () => {
+        if (!isSwiping || !isMobileViewport()) return;
+
+        const deltaX = touchCurrentX - touchStartX;
+        const elapsed = Date.now() - touchStartTime;
+        const velocity = Math.abs(deltaX) / elapsed;
+        const sidebarOpen = sidebar.classList.contains('mobile-open');
+
+        // Reset transition
+        sidebar.style.transition = '';
+        sidebar.style.transform = '';
+        sidebarOverlay.style.opacity = '';
+        sidebarOverlay.style.visibility = '';
+        sidebarOverlay.style.display = '';
+
+        // Determine if swipe was enough to toggle
+        const shouldToggle = Math.abs(deltaX) > SWIPE_THRESHOLD || velocity > VELOCITY_THRESHOLD;
+
+        if (!sidebarOpen && deltaX > 0 && shouldToggle) {
+          // Open sidebar
+          sidebar.classList.add('mobile-open');
+          sidebarOverlay.classList.add('active');
+        } else if (sidebarOpen && deltaX < 0 && shouldToggle) {
+          // Close sidebar
+          sidebar.classList.remove('mobile-open');
+          sidebarOverlay.classList.remove('active');
+        }
+
+        isSwiping = false;
+      }, { passive: true });
+
+      // Cancel on touch cancel
+      document.addEventListener('touchcancel', () => {
+        if (isSwiping) {
+          sidebar.style.transition = '';
+          sidebar.style.transform = '';
+          sidebarOverlay.style.opacity = '';
+          sidebarOverlay.style.visibility = '';
+          sidebarOverlay.style.display = '';
+          isSwiping = false;
+        }
+      }, { passive: true });
+    })();
 
     init();
   </script>

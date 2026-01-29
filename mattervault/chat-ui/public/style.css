@@ -1098,14 +1098,21 @@ a.source-citation.clickable::before {
   opacity: 1;
 }
 
-/* Responsive */
+/* ==========================================================================
+   MOBILE RESPONSIVE DESIGN
+   Optimized for touch, thumb-zone ergonomics, and one-handed use
+   ========================================================================== */
+
+/* Tablet breakpoint (900px) */
 @media (max-width: 900px) {
   .sidebar {
     position: fixed;
     left: 0;
     top: 0;
     transform: translateX(-100%);
-    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.3);
+    box-shadow: 4px 0 30px rgba(0, 0, 0, 0.5);
+    z-index: 100;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .sidebar.mobile-open {
@@ -1121,78 +1128,561 @@ a.source-citation.clickable::before {
   .container {
     padding-left: 60px;
   }
+
+  /* Improve sidebar overlay */
+  .sidebar-overlay {
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+  }
 }
 
+/* Mobile breakpoint (768px) */
 @media (max-width: 768px) {
+  /* Safe area padding for notched devices */
+  body {
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+
   .container {
-    padding: 16px;
-    padding-left: 60px;
+    padding: 12px;
+    padding-left: 56px;
+    padding-bottom: 0; /* Input area handles bottom padding */
   }
 
+  /* Compact header for mobile */
   header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 16px;
-  }
-
-  .header-controls {
-    width: 100%;
-    flex-direction: column;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
     gap: 12px;
+    padding-bottom: 16px;
+    position: sticky;
+    top: 0;
+    background: var(--bg-deep);
+    z-index: 10;
+    margin: -12px -12px 0 -56px;
+    padding: 12px 12px 12px 56px;
+    border-bottom: 1px solid var(--border-subtle);
   }
 
-  .family-selector {
-    width: 100%;
-  }
-
-  select {
+  .brand {
     flex: 1;
+    min-width: 0;
   }
 
-  .user-menu {
-    width: 100%;
-    justify-content: space-between;
-  }
-
-  .export-dropdown.visible {
-    width: 100%;
-  }
-
-  .export-btn {
-    width: 100%;
-    justify-content: center;
-  }
-
-  .export-menu {
-    left: 0;
-    right: 0;
+  .brand-label {
+    display: none; /* Hide on mobile to save space */
   }
 
   h1 {
-    font-size: 1.5rem;
+    font-size: 1.3rem;
   }
 
-  .message {
-    max-width: 95%;
-  }
-}
-
-@media (max-width: 480px) {
-  .container {
-    padding: 12px;
-    padding-left: 50px;
-  }
-
-  .sidebar {
+  /* Mobile header controls - horizontal compact layout */
+  .header-controls {
     width: 100%;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 8px;
+    order: 2;
   }
 
-  .mobile-sidebar-toggle {
-    left: 12px;
-    top: 12px;
+  .family-selector {
+    flex: 1;
+    min-width: 140px;
+  }
+
+  /* Compact select on mobile */
+  select {
+    padding: 10px 36px 10px 12px;
+    font-size: 0.85rem;
+    min-width: auto;
+    border-radius: 10px;
+  }
+
+  /* Hide doc count on mobile */
+  .doc-count {
+    display: none !important;
+  }
+
+  /* User menu compact */
+  .user-menu {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
   }
 
   .user-info {
     display: none;
+  }
+
+  .admin-link {
+    padding: 10px;
+    border-radius: 10px;
+  }
+
+  .admin-link span {
+    display: none; /* Icon only on mobile */
+  }
+
+  .admin-link svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .logout-btn {
+    padding: 10px 14px;
+    font-size: 0.8rem;
+  }
+
+  /* Hide export on mobile - use share sheet instead */
+  .export-dropdown {
+    display: none !important;
+  }
+
+  /* Chat container fills remaining space */
+  .chat-container {
+    padding-top: 12px;
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 140px);
+    height: calc(100dvh - 140px); /* Dynamic viewport height */
+  }
+
+  /* Messages area */
+  .messages {
+    flex: 1;
+    border-radius: 16px 16px 0 0;
+    padding: 12px;
+    margin-bottom: 0;
+    /* Momentum scrolling */
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+
+  /* Message bubbles optimized for mobile */
+  .message {
+    max-width: 88%;
+  }
+
+  .message-content {
+    padding: 12px 14px;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    border-radius: 14px;
+  }
+
+  .message.user .message-content {
+    border-bottom-right-radius: 4px;
+  }
+
+  .message.assistant .message-content {
+    border-bottom-left-radius: 4px;
+  }
+
+  .message-label {
+    font-size: 0.65rem;
+  }
+
+  /* Copy button always visible on mobile (no hover) */
+  .copy-btn {
+    opacity: 0.7;
+    padding: 8px 10px;
+  }
+
+  /* Welcome message compact */
+  .welcome-message {
+    padding: 40px 16px;
+  }
+
+  .welcome-message h2 {
+    font-size: 1.2rem;
+  }
+
+  .welcome-message p {
+    font-size: 0.85rem;
+  }
+
+  .welcome-icon svg {
+    width: 40px;
+    height: 40px;
+  }
+
+  /* Input area - thumb-friendly bottom position */
+  .input-area {
+    border-radius: 16px 16px 0 0;
+    padding: 12px;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom));
+    position: sticky;
+    bottom: 0;
+    background: var(--bg-surface);
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .input-wrapper {
+    border-radius: 24px; /* Pill shape on mobile */
+    padding: 4px 4px 4px 16px;
+  }
+
+  .input-wrapper input {
+    padding: 12px 8px;
+    font-size: 16px; /* Prevents iOS zoom */
+  }
+
+  .input-wrapper button {
+    width: 44px;
+    height: 44px;
+    border-radius: 20px;
+    padding: 0;
+    flex-shrink: 0;
+  }
+
+  .input-wrapper button svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .input-hint {
+    font-size: 0.7rem;
+    margin-top: 8px;
+  }
+
+  /* Mobile sidebar toggle - larger touch target */
+  .mobile-sidebar-toggle {
+    left: 12px;
+    top: 12px;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .mobile-sidebar-toggle svg {
+    width: 22px;
+    height: 22px;
+  }
+
+  /* Sidebar improvements for mobile */
+  .sidebar {
+    width: 85%;
+    max-width: 320px;
+  }
+
+  .sidebar-header {
+    padding: 16px;
+    padding-top: calc(16px + env(safe-area-inset-top));
+  }
+
+  .new-chat-btn {
+    padding: 14px 20px;
+    font-size: 0.95rem;
+    border-radius: 12px;
+  }
+
+  .sidebar-toggle {
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Conversation items - larger touch targets */
+  .conversation-item {
+    padding: 14px 16px;
+    margin-bottom: 6px;
+    border-radius: 12px;
+    min-height: 64px;
+  }
+
+  .conversation-title {
+    font-size: 0.95rem;
+    margin-bottom: 6px;
+  }
+
+  .conversation-meta {
+    font-size: 0.8rem;
+  }
+
+  /* Delete button always visible on mobile */
+  .conversation-delete {
+    opacity: 1;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Modal adjustments for mobile */
+  .modal-overlay {
+    padding: 16px;
+    align-items: flex-end; /* Bottom sheet style */
+  }
+
+  .modal {
+    border-radius: 20px 20px 0 0;
+    padding: 24px;
+    padding-bottom: calc(24px + env(safe-area-inset-bottom));
+    max-width: 100%;
+    width: 100%;
+    animation: slideUp 0.3s ease-out;
+  }
+
+  @keyframes slideUp {
+    from {
+      transform: translateY(100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+
+  .modal h3 {
+    font-size: 1.1rem;
+  }
+
+  .modal p {
+    font-size: 0.9rem;
+  }
+
+  .modal-actions {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .modal-cancel,
+  .modal-confirm {
+    width: 100%;
+    padding: 14px;
+    font-size: 0.95rem;
+    border-radius: 12px;
+  }
+
+  /* Document preview panel - full screen on mobile */
+  .doc-preview-panel {
+    width: 100%;
+    right: -100%;
+  }
+
+  .doc-preview-header {
+    padding: 12px 16px;
+    padding-top: calc(12px + env(safe-area-inset-top));
+  }
+
+  .doc-preview-action {
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Source citations - more tappable */
+  .source-citation {
+    padding: 6px 12px;
+    font-size: 0.85em;
+    margin: 4px 4px 4px 0;
+  }
+
+  a.source-citation.clickable {
+    min-height: 36px;
+    display: inline-flex;
+    align-items: center;
+  }
+}
+
+/* Small phone breakpoint (480px) */
+@media (max-width: 480px) {
+  .container {
+    padding: 10px;
+    padding-left: 52px;
+  }
+
+  header {
+    margin: -10px -10px 0 -52px;
+    padding: 10px 10px 10px 52px;
+  }
+
+  h1 {
+    font-size: 1.15rem;
+  }
+
+  .mobile-sidebar-toggle {
+    left: 8px;
+    top: 10px;
+    width: 40px;
+    height: 40px;
+  }
+
+  /* Full width sidebar on small phones */
+  .sidebar {
+    width: 100%;
+    max-width: none;
+  }
+
+  /* Even more compact messages */
+  .messages {
+    padding: 10px;
+  }
+
+  .message {
+    max-width: 92%;
+  }
+
+  .message-content {
+    padding: 10px 12px;
+    font-size: 0.88rem;
+  }
+
+  .input-area {
+    padding: 10px;
+    padding-bottom: calc(10px + env(safe-area-inset-bottom));
+  }
+
+  .input-wrapper input {
+    padding: 10px 6px;
+  }
+
+  .input-wrapper button {
+    width: 40px;
+    height: 40px;
+  }
+
+  /* Hide logout text, show icon */
+  .logout-btn {
+    padding: 10px;
+    font-size: 0;
+    position: relative;
+  }
+
+  .logout-btn::before {
+    content: '';
+    display: block;
+    width: 18px;
+    height: 18px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%23ff5c72' stroke-width='2'%3E%3Cpath d='M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4'/%3E%3Cpolyline points='16 17 21 12 16 7'/%3E%3Cline x1='21' y1='12' x2='9' y2='12'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: center;
+  }
+
+  /* Conversation list padding for small screens */
+  .conversation-list {
+    padding: 10px;
+  }
+
+  .conversation-item {
+    padding: 12px 14px;
+    min-height: 56px;
+  }
+}
+
+/* Touch-specific enhancements */
+@media (hover: none) and (pointer: coarse) {
+  /* Remove hover effects that don't work on touch */
+  .conversation-item:hover {
+    background: rgba(0, 0, 0, 0.2);
+    border-color: transparent;
+  }
+
+  .conversation-item:active {
+    background: rgba(0, 0, 0, 0.4);
+    border-color: var(--border-subtle);
+    transform: scale(0.98);
+  }
+
+  .new-chat-btn:active {
+    transform: scale(0.96);
+  }
+
+  .input-wrapper button:active:not(:disabled) {
+    transform: scale(0.9);
+  }
+
+  /* Ensure sufficient touch targets */
+  button, a, select, input {
+    min-height: 44px;
+  }
+
+  /* Active states for touch feedback */
+  .copy-btn:active {
+    background: rgba(0, 212, 170, 0.2);
+    color: var(--accent-teal);
+  }
+
+  .modal-cancel:active,
+  .modal-confirm:active {
+    transform: scale(0.98);
+  }
+
+  .source-citation:active {
+    transform: scale(0.96);
+  }
+}
+
+/* Landscape phone - optimize for wide but short viewport */
+@media (max-height: 500px) and (orientation: landscape) {
+  header {
+    padding: 8px 12px 8px 52px;
+  }
+
+  .brand-label {
+    display: none;
+  }
+
+  h1 {
+    font-size: 1.1rem;
+  }
+
+  .chat-container {
+    height: calc(100vh - 80px);
+    height: calc(100dvh - 80px);
+  }
+
+  .messages {
+    padding: 8px;
+  }
+
+  .message-content {
+    padding: 8px 12px;
+  }
+
+  .input-area {
+    padding: 8px 12px;
+  }
+
+  .welcome-message {
+    padding: 20px;
+  }
+
+  .welcome-icon {
+    display: none;
+  }
+}
+
+/* High contrast / reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .sidebar,
+  .modal,
+  .doc-preview-panel,
+  .conversation-item,
+  button {
+    transition: none;
+  }
+
+  @keyframes slideUp {
+    from, to {
+      transform: none;
+      opacity: 1;
+    }
   }
 }
