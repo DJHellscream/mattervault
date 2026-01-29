@@ -59,7 +59,7 @@ app.get('/login.html', (req, res) => {
 });
 
 // Serve audit admin page (auth check happens client-side)
-app.get('/audit.html', (req, res) => {
+app.get('/audit', (req, res) => {
   res.sendFile(path.join(__dirname, '../public/audit.html'));
 });
 

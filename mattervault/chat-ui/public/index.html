@@ -65,6 +65,31 @@
       border-color: rgba(255, 92, 114, 0.4);
     }
 
+    .admin-link {
+      display: none;
+      align-items: center;
+      gap: 6px;
+      background: rgba(0, 212, 170, 0.1);
+      border: 1px solid rgba(0, 212, 170, 0.2);
+      border-radius: 8px;
+      padding: 8px 12px;
+      color: var(--accent-teal);
+      font-family: 'Outfit', sans-serif;
+      font-size: 0.85rem;
+      font-weight: 500;
+      text-decoration: none;
+      transition: all 0.2s ease;
+    }
+
+    .admin-link:hover {
+      background: rgba(0, 212, 170, 0.2);
+      border-color: rgba(0, 212, 170, 0.4);
+    }
+
+    .admin-link.visible {
+      display: flex;
+    }
+
     /* Loading overlay for auth check */
     .auth-loading {
       position: fixed;
@@ -578,6 +603,12 @@
                 <div class="user-family" id="userFamily"></div>
               </div>
             </div>
+            <a href="/audit" class="admin-link" id="adminLink">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+              </svg>
+              Audit Logs
+            </a>
             <button class="logout-btn" id="logoutBtn">Logout</button>
           </div>
         </div>
@@ -844,6 +875,12 @@
         userAvatar.textContent = displayName.charAt(0).toUpperCase();
         // Users can access any family, so hide the family badge
         userFamily.style.display = 'none';
+
+        // Show admin link if user is admin
+        const adminLink = document.getElementById('adminLink');
+        if (adminLink && currentUser.role === 'admin') {
+          adminLink.classList.add('visible');
+        }
       }
     }
 
