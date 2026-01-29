@@ -5,10 +5,15 @@
 
 const express = require('express');
 const db = require('./db');
+const AuditLogger = require('./auditLogger');
 
 // Ollama configuration
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://host.docker.internal:11434';
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'llama3.1:8b';
+
+// Chat history configuration (sliding window)
+// Number of previous messages to include for conversation context
+const CHAT_HISTORY_LIMIT = parseInt(process.env.CHAT_HISTORY_LIMIT) || 10;
 
 /**
  * System prompt for Mattervault legal assistant
@@ -38,7 +43,16 @@ function createStreamingRouter(config) {
    */
   router.get('/stream', async (req, res) => {
     const userId = req.user.id;
+    const paperlessUsername = req.user.paperlessUsername || req.user.username;
     const { question, family_id, conversation_id } = req.query;
+
+    // Generate correlation ID for audit trail
+    const correlationId = AuditLogger.generateCorrelationId();
+    const requestStartTime = Date.now();
+
+    // Extract client metadata for audit
+    const clientIp = AuditLogger.getClientIp(req);
+    const userAgent = AuditLogger.getUserAgent(req);
 
     // Validate required parameters
     if (!question) {
@@ -48,10 +62,8 @@ function createStreamingRouter(config) {
       return res.status(400).json({ error: 'family_id is required' });
     }
 
-    // Verify user has access to this family_id
-    if (req.user.family_id !== family_id) {
-      return res.status(403).json({ error: 'Access denied to this family' });
-    }
+    // Open access model: any authenticated user can query any family
+    // Family selection is per-conversation, not restricted by user assignment
 
     // Set SSE headers
     res.setHeader('Content-Type', 'text/event-stream');
@@ -112,6 +124,24 @@ function createStreamingRouter(config) {
         [conversationId, 'user', question]
       );
 
+      // Fetch chat history for context (sliding window)
+      // Get the last N messages BEFORE the current question (excluding it since we just added it)
+      let chatHistory = [];
+      if (CHAT_HISTORY_LIMIT > 0) {
+        const { rows: historyRows } = await db.query(
+          `SELECT role, content FROM messages
+           WHERE conversation_id = $1
+           ORDER BY created_at DESC
+           LIMIT $2 OFFSET 1`,  // OFFSET 1 to skip the question we just inserted
+          [conversationId, CHAT_HISTORY_LIMIT]
+        );
+        // Reverse to get chronological order (oldest first)
+        chatHistory = historyRows.reverse().map(row => ({
+          role: row.role,
+          content: row.content
+        }));
+      }
+
       // Step 2: Get context from n8n (search + rerank)
       res.write(`data: ${JSON.stringify({ type: 'status', status: 'searching' })}\n\n`);
 
@@ -121,20 +151,51 @@ function createStreamingRouter(config) {
         body: JSON.stringify({
           family_id,
           question,
+          chat_history: chatHistory,  // Include conversation history
           session_id: `stream-${Date.now()}`,
-          context_only: true  // Flag to request only context, not generation
+          context_only: true,  // Flag to request only context, not generation
+          correlation_id: correlationId  // Audit trail tracking
         })
       });
 
       let context = '';
       let citations = [];
+      let n8nFullResponse = null; // If n8n returns a full answer, use it directly
+      let documentsRetrieved = []; // All docs returned by search (for audit)
+      let n8nExecutionId = null; // N8N execution ID (for audit)
 
       if (contextResponse.ok) {
         const contextData = await contextResponse.json();
 
+        // Extract n8n execution ID for audit trail
+        n8nExecutionId = contextData.execution_id || contextData.executionId || null;
+
+        // Extract documents retrieved for audit (before any filtering)
+        if (contextData.documents_retrieved) {
+          documentsRetrieved = contextData.documents_retrieved;
+        } else if (contextData.documents) {
+          documentsRetrieved = contextData.documents.map(doc => ({
+            document_id: doc.document_id,
+            title: doc.source || doc.document_title,
+            page: doc.page_num || doc.page,
+            score: doc.score
+          }));
+        }
+
         // Extract context from n8n response
         // The n8n workflow may return context in different formats
-        if (contextData.context) {
+        if (contextData.output || contextData.text || contextData.answer || contextData.response) {
+          // n8n returned a full generated answer - use it directly (skip Ollama)
+          n8nFullResponse = contextData.output || contextData.text || contextData.answer || contextData.response;
+          // Also extract citations if n8n included them
+          if (contextData.citations && Array.isArray(contextData.citations)) {
+            citations = contextData.citations.map(c => ({
+              source: c.source || c.title || c.document_title,
+              page: c.page || c.page_num,
+              document_id: c.document_id
+            }));
+          }
+        } else if (contextData.context) {
           context = Array.isArray(contextData.context)
             ? contextData.context.map(doc => doc.text || doc.content || doc).join('\n\n---\n\n')
             : contextData.context;
@@ -150,109 +211,123 @@ function createStreamingRouter(config) {
             page: doc.page_num || doc.page,
             document_id: doc.document_id
           }));
-        } else if (contextData.text) {
-          // Fallback: n8n returned full response (non-streaming mode)
-          // Use that as context
-          context = contextData.text;
         }
       }
 
       // If we couldn't get context from n8n, try a fallback or inform user
-      if (!context) {
+      if (!context && !n8nFullResponse) {
         context = 'No relevant documents found for this query.';
       }
 
-      // Step 3: Stream from Ollama
+      // Step 3: Generate response (use n8n response directly or call Ollama)
       res.write(`data: ${JSON.stringify({ type: 'status', status: 'generating' })}\n\n`);
 
-      const ollamaResponse = await fetch(`${OLLAMA_URL}/api/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: OLLAMA_MODEL,
-          messages: [
-            {
-              role: 'system',
-              content: `${SYSTEM_PROMPT}\n\n--- CONTEXT DOCUMENTS ---\n${context}\n--- END CONTEXT ---`
-            },
-            { role: 'user', content: question }
-          ],
-          stream: true,
-          options: {
-            temperature: 0.3,  // Lower temperature for more factual responses
-            num_predict: 2048  // Max tokens
+      if (n8nFullResponse) {
+        // n8n already generated the answer - stream it directly (simulated streaming)
+        fullResponse = n8nFullResponse;
+
+        // Send the full response as tokens (chunked for streaming effect)
+        const chunkSize = 20; // characters per chunk
+        for (let i = 0; i < fullResponse.length; i += chunkSize) {
+          if (clientDisconnected) break;
+          const chunk = fullResponse.slice(i, i + chunkSize);
+          res.write(`data: ${JSON.stringify({
+            type: 'token',
+            content: chunk,
+            done: i + chunkSize >= fullResponse.length
+          })}\n\n`);
+        }
+      } else {
+        // Call Ollama with context from n8n
+        const ollamaResponse = await fetch(`${OLLAMA_URL}/api/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: OLLAMA_MODEL,
+            messages: [
+              {
+                role: 'system',
+                content: `${SYSTEM_PROMPT}\n\n--- CONTEXT DOCUMENTS ---\n${context}\n--- END CONTEXT ---`
+              },
+              { role: 'user', content: question }
+            ],
+            stream: true,
+            options: {
+              temperature: 0.3,  // Lower temperature for more factual responses
+              num_predict: 2048  // Max tokens
+            }
+          }),
+          signal: abortController.signal
+        });
+
+        if (!ollamaResponse.ok) {
+          const errorText = await ollamaResponse.text();
+          console.error(`Ollama error: ${ollamaResponse.status} - ${errorText}`);
+          throw new Error('Failed to generate response. Please try again.');
+        }
+
+        // Ollama streams NDJSON (newline-delimited JSON)
+        // Each line is a JSON object with { message: { content: "..." }, done: bool }
+        const reader = ollamaResponse.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+          // Check if client disconnected before reading more
+          if (clientDisconnected) break;
+
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+
+          // Process complete lines
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || ''; // Keep incomplete line in buffer
+
+          for (const line of lines) {
+            if (!line.trim()) continue;
+
+            try {
+              const data = JSON.parse(line);
+              const content = data.message?.content || '';
+
+              if (content) {
+                fullResponse += content;
+                // Send token to client
+                res.write(`data: ${JSON.stringify({
+                  type: 'token',
+                  content: content,
+                  done: data.done || false
+                })}\n\n`);
+              }
+
+              if (data.done) {
+                // Ollama signals completion
+                break;
+              }
+            } catch (parseErr) {
+              console.error('Error parsing Ollama response line:', parseErr.message, 'Line:', line);
+            }
           }
-        }),
-        signal: abortController.signal
-      });
+        }
 
-      if (!ollamaResponse.ok) {
-        const errorText = await ollamaResponse.text();
-        console.error(`Ollama error: ${ollamaResponse.status} - ${errorText}`);
-        throw new Error('Failed to generate response. Please try again.');
-      }
-
-      // Ollama streams NDJSON (newline-delimited JSON)
-      // Each line is a JSON object with { message: { content: "..." }, done: bool }
-      const reader = ollamaResponse.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      while (true) {
-        // Check if client disconnected before reading more
-        if (clientDisconnected) break;
-
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-
-        // Process complete lines
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || ''; // Keep incomplete line in buffer
-
-        for (const line of lines) {
-          if (!line.trim()) continue;
-
+        // Process any remaining buffer
+        if (buffer.trim()) {
           try {
-            const data = JSON.parse(line);
+            const data = JSON.parse(buffer);
             const content = data.message?.content || '';
-
             if (content) {
               fullResponse += content;
-              // Send token to client
               res.write(`data: ${JSON.stringify({
                 type: 'token',
                 content: content,
-                done: data.done || false
+                done: true
               })}\n\n`);
             }
-
-            if (data.done) {
-              // Ollama signals completion
-              break;
-            }
           } catch (parseErr) {
-            console.error('Error parsing Ollama response line:', parseErr.message, 'Line:', line);
+            // Ignore incomplete JSON at end
           }
-        }
-      }
-
-      // Process any remaining buffer
-      if (buffer.trim()) {
-        try {
-          const data = JSON.parse(buffer);
-          const content = data.message?.content || '';
-          if (content) {
-            fullResponse += content;
-            res.write(`data: ${JSON.stringify({
-              type: 'token',
-              content: content,
-              done: true
-            })}\n\n`);
-          }
-        } catch (parseErr) {
-          // Ignore incomplete JSON at end
         }
       }
 
@@ -268,6 +343,26 @@ function createStreamingRouter(config) {
         `UPDATE conversations SET updated_at = NOW() WHERE id = $1`,
         [conversationId]
       );
+
+      // Step 5: Log to audit trail (async, don't block response)
+      const totalLatencyMs = Date.now() - requestStartTime;
+      AuditLogger.logQuery({
+        correlationId,
+        n8nExecutionId,
+        userId,
+        paperlessUsername,
+        clientIp,
+        userAgent,
+        familyId: family_id,
+        conversationId,
+        queryText: question,
+        responseText: fullResponse,
+        documentsRetrieved,
+        documentsCited: citations,
+        totalLatencyMs
+      }).catch(err => {
+        console.error('Audit logging error (non-blocking):', err.message);
+      });
 
       // Send completion signal
       res.write(`data: ${JSON.stringify({

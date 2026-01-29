@@ -4,6 +4,7 @@ const cookieParser = require('cookie-parser');
 const { createApiRouter } = require('./api');
 const { createStreamingRouter } = require('./streaming');
 const authRoutes = require('./routes/auth');
+const auditRoutes = require('./routes/audit');
 const conversationsRoutes = require('./routes/conversations');
 const { createDocumentsRouter } = require('./routes/documents');
 const { waitForDatabase, runMigrations } = require('./migrations');
@@ -43,6 +44,9 @@ app.use('/api/conversations', requireAuth, conversationsRoutes);
 // Protected documents routes (for PDF preview with family authorization)
 app.use('/api/documents', requireAuth, createDocumentsRouter(config));
 
+// Protected audit routes (admin only - enforced in route handlers)
+app.use('/api/audit', auditRoutes);
+
 // Protected streaming routes (SSE for chat)
 app.use('/api/chat', requireAuth, createStreamingRouter(config));
 
@@ -54,9 +58,10 @@ app.get('/login.html', (req, res) => {
   res.sendFile(path.join(__dirname, '../public/login.html'));
 });
 
-// Serve register page
+// Registration is disabled - users authenticate via Paperless
+// Redirect old register links to login
 app.get('/register.html', (req, res) => {
-  res.sendFile(path.join(__dirname, '../public/register.html'));
+  res.redirect('/login.html');
 });
 
 // Serve index (main app) - client-side will handle auth check
