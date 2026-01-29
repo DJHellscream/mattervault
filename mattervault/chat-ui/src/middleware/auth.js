@@ -30,11 +30,11 @@ function requireAuth(req, res, next) {
     });
   }
 
-  // Attach user info to request
+  // Attach user info to request (Paperless-based auth)
   req.user = {
     id: decoded.userId,
-    email: decoded.email,
-    familyId: decoded.familyId,
+    paperlessUserId: decoded.paperlessUserId,
+    paperlessUsername: decoded.paperlessUsername,
     role: decoded.role,
     displayName: decoded.displayName
   };
@@ -57,8 +57,8 @@ function optionalAuth(req, res, next) {
     if (decoded) {
       req.user = {
         id: decoded.userId,
-        email: decoded.email,
-        familyId: decoded.familyId,
+        paperlessUserId: decoded.paperlessUserId,
+        paperlessUsername: decoded.paperlessUsername,
         role: decoded.role,
         displayName: decoded.displayName
       };

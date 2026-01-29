@@ -1,9 +1,10 @@
 /**
  * Documents routes
- * Document preview with family-based access control
+ * Document preview using user's Paperless token (open access model)
  */
 
 const express = require('express');
+const auth = require('../auth');
 
 const router = express.Router();
 
@@ -12,24 +13,23 @@ let paperlessConfig = null;
 
 /**
  * Initialize router with config
- * @param {Object} config - Application config with paperless credentials
+ * @param {Object} config - Application config with paperless URL
  */
 function createDocumentsRouter(config) {
   paperlessConfig = config.paperless;
 
   /**
    * GET /api/documents/:id/preview
-   * Stream PDF from Paperless with family tag authorization
+   * Stream PDF from Paperless using user's Paperless token
    *
    * Security:
    * - Requires authentication (via requireAuth middleware)
-   * - Validates document has user's family tag
-   * - Only allows access to documents tagged with user's family_id
+   * - Uses user's Paperless token (Paperless enforces its own permissions)
+   * - Open access model: no family_id validation at this layer
    */
   router.get('/:id/preview', async (req, res) => {
     try {
       const docId = req.params.id;
-      const userFamilyId = req.user.familyId;
 
       // Validate docId is a number
       if (!/^\d+$/.test(docId)) {
@@ -39,10 +39,16 @@ function createDocumentsRouter(config) {
         });
       }
 
-      // Create Basic auth header for Paperless API
-      const authHeader = 'Basic ' + Buffer.from(
-        `${paperlessConfig.user}:${paperlessConfig.pass}`
-      ).toString('base64');
+      // Get user's Paperless token from database
+      const user = await auth.getUserById(req.user.id);
+      if (!user || !user.paperless_token) {
+        return res.status(401).json({
+          error: 'Paperless authentication required. Please log in again.',
+          code: 'NO_PAPERLESS_TOKEN'
+        });
+      }
+
+      const authHeader = `Token ${user.paperless_token}`;
 
       // 1. Fetch document metadata from Paperless API
       const metadataResponse = await fetch(
@@ -62,56 +68,18 @@ function createDocumentsRouter(config) {
             code: 'NOT_FOUND'
           });
         }
+        if (metadataResponse.status === 403) {
+          return res.status(403).json({
+            error: 'Access denied by Paperless',
+            code: 'FORBIDDEN'
+          });
+        }
         throw new Error(`Paperless API error: ${metadataResponse.status}`);
       }
 
       const docMetadata = await metadataResponse.json();
 
-      // 2. Fetch tag details to check family authorization
-      // Document metadata includes tag IDs, we need to fetch tag slugs
-      const tagIds = docMetadata.tags || [];
-
-      if (tagIds.length === 0) {
-        // Document has no tags, cannot verify family access
-        return res.status(403).json({
-          error: 'Access denied: document has no family tag',
-          code: 'FORBIDDEN'
-        });
-      }
-
-      // Fetch tag details to get slugs
-      const tagsResponse = await fetch(
-        `${paperlessConfig.url}/api/tags/?id__in=${tagIds.join(',')}`,
-        {
-          headers: {
-            'Authorization': authHeader,
-            'Accept': 'application/json'
-          }
-        }
-      );
-
-      if (!tagsResponse.ok) {
-        throw new Error(`Failed to fetch tags: ${tagsResponse.status}`);
-      }
-
-      const tagsData = await tagsResponse.json();
-      const tags = tagsData.results || [];
-
-      // 3. Check if document has user's family tag
-      const hasAccess = tags.some(tag =>
-        tag.slug === userFamilyId ||
-        tag.name.toLowerCase() === userFamilyId.toLowerCase()
-      );
-
-      if (!hasAccess) {
-        console.log(`Access denied for user family '${userFamilyId}' to document ${docId}. Tags: ${tags.map(t => t.slug).join(', ')}`);
-        return res.status(403).json({
-          error: 'Access denied: document belongs to a different family',
-          code: 'FORBIDDEN'
-        });
-      }
-
-      // 4. Stream PDF from Paperless to response
+      // 2. Stream PDF from Paperless to response
       const downloadResponse = await fetch(
         `${paperlessConfig.url}/api/documents/${docId}/download/`,
         {
@@ -122,6 +90,12 @@ function createDocumentsRouter(config) {
       );
 
       if (!downloadResponse.ok) {
+        if (downloadResponse.status === 403) {
+          return res.status(403).json({
+            error: 'Access denied by Paperless',
+            code: 'FORBIDDEN'
+          });
+        }
         throw new Error(`Failed to download document: ${downloadResponse.status}`);
       }
 
@@ -158,12 +132,11 @@ function createDocumentsRouter(config) {
   /**
    * GET /api/documents/:id/metadata
    * Get document metadata (title, tags, etc.) for display purposes
-   * Also requires family authorization
+   * Uses user's Paperless token (Paperless enforces its own permissions)
    */
   router.get('/:id/metadata', async (req, res) => {
     try {
       const docId = req.params.id;
-      const userFamilyId = req.user.familyId;
 
       // Validate docId is a number
       if (!/^\d+$/.test(docId)) {
@@ -173,9 +146,16 @@ function createDocumentsRouter(config) {
         });
       }
 
-      const authHeader = 'Basic ' + Buffer.from(
-        `${paperlessConfig.user}:${paperlessConfig.pass}`
-      ).toString('base64');
+      // Get user's Paperless token from database
+      const user = await auth.getUserById(req.user.id);
+      if (!user || !user.paperless_token) {
+        return res.status(401).json({
+          error: 'Paperless authentication required. Please log in again.',
+          code: 'NO_PAPERLESS_TOKEN'
+        });
+      }
+
+      const authHeader = `Token ${user.paperless_token}`;
 
       // Fetch document metadata
       const metadataResponse = await fetch(
@@ -195,46 +175,16 @@ function createDocumentsRouter(config) {
             code: 'NOT_FOUND'
           });
         }
+        if (metadataResponse.status === 403) {
+          return res.status(403).json({
+            error: 'Access denied by Paperless',
+            code: 'FORBIDDEN'
+          });
+        }
         throw new Error(`Paperless API error: ${metadataResponse.status}`);
       }
 
       const docMetadata = await metadataResponse.json();
-      const tagIds = docMetadata.tags || [];
-
-      // Fetch and validate tags
-      if (tagIds.length > 0) {
-        const tagsResponse = await fetch(
-          `${paperlessConfig.url}/api/tags/?id__in=${tagIds.join(',')}`,
-          {
-            headers: {
-              'Authorization': authHeader,
-              'Accept': 'application/json'
-            }
-          }
-        );
-
-        if (tagsResponse.ok) {
-          const tagsData = await tagsResponse.json();
-          const tags = tagsData.results || [];
-
-          const hasAccess = tags.some(tag =>
-            tag.slug === userFamilyId ||
-            tag.name.toLowerCase() === userFamilyId.toLowerCase()
-          );
-
-          if (!hasAccess) {
-            return res.status(403).json({
-              error: 'Access denied: document belongs to a different family',
-              code: 'FORBIDDEN'
-            });
-          }
-        }
-      } else {
-        return res.status(403).json({
-          error: 'Access denied: document has no family tag',
-          code: 'FORBIDDEN'
-        });
-      }
 
       // Return sanitized metadata
       res.json({

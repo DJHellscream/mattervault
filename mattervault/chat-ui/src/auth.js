@@ -1,9 +1,8 @@
 /**
  * Authentication utilities
- * JWT generation, password hashing, token management
+ * Paperless-ngx authentication, JWT generation, token management
  */
 
-const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const Redis = require('ioredis');
@@ -11,9 +10,13 @@ const db = require('./db');
 
 // Configuration
 const JWT_SECRET = process.env.JWT_SECRET || 'dev_jwt_secret_change_in_production';
-const ACCESS_TOKEN_EXPIRY = '15m';
-const REFRESH_TOKEN_EXPIRY_DAYS = 7;
-const BCRYPT_ROUNDS = 12;
+const ACCESS_TOKEN_EXPIRY = '24h';           // Default session length
+const REMEMBER_ME_EXPIRY = '30d';            // Extended session when "remember me" checked
+const REFRESH_TOKEN_EXPIRY_DAYS = 30;        // Refresh token valid for 30 days
+const PAPERLESS_URL = process.env.PAPERLESS_URL || 'http://mattervault:8000';
+
+// System tags to exclude when fetching families
+const SYSTEM_TAGS = ['inbox', 'intake', 'processed', 'error', 'pending'];
 
 // Redis client for session caching (uses database 1 to avoid Paperless collisions)
 const redis = new Redis(process.env.REDIS_URL || 'redis://mattercache:6379/1');
@@ -27,40 +30,153 @@ redis.on('connect', () => {
 });
 
 /**
- * Hash a password using bcrypt
- * @param {string} password - Plain text password
- * @returns {Promise<string>} Hashed password
+ * Verify credentials against Paperless-ngx API
+ * @param {string} username - Paperless username
+ * @param {string} password - Paperless password
+ * @returns {Promise<Object|null>} Token response or null if invalid
  */
-async function hashPassword(password) {
-  return bcrypt.hash(password, BCRYPT_ROUNDS);
+async function verifyPaperlessCredentials(username, password) {
+  try {
+    const response = await fetch(`${PAPERLESS_URL}/api/token/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+
+    if (!response.ok) {
+      console.log(`Paperless auth failed for ${username}: ${response.status}`);
+      return null;
+    }
+
+    return response.json();
+  } catch (err) {
+    console.error('Paperless authentication error:', err.message);
+    return null;
+  }
 }
 
 /**
- * Verify a password against a hash
- * @param {string} password - Plain text password
- * @param {string} hash - Stored hash
- * @returns {Promise<boolean>}
+ * Fetch user information from Paperless
+ * @param {string} token - Paperless API token
+ * @returns {Promise<Object|null>} User info or null
  */
-async function verifyPassword(password, hash) {
-  return bcrypt.compare(password, hash);
+async function fetchPaperlessUser(token) {
+  try {
+    // Paperless-ngx doesn't have a dedicated /me endpoint, but we can get user info
+    // from the users API if we have permission, otherwise we just return basic info
+    const response = await fetch(`${PAPERLESS_URL}/api/ui_settings/`, {
+      headers: { 'Authorization': `Token ${token}` }
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await response.json();
+    return {
+      id: data.user?.id,
+      username: data.user?.username,
+      displayName: data.display_name || data.user?.username,
+      isSuperuser: data.user?.is_superuser || false
+    };
+  } catch (err) {
+    console.error('Error fetching Paperless user:', err.message);
+    return null;
+  }
+}
+
+/**
+ * Fetch all family tags from Paperless
+ * @param {string} token - Paperless API token
+ * @returns {Promise<Array>} Array of family tags with document counts
+ */
+async function fetchUserFamilies(token) {
+  try {
+    const response = await fetch(`${PAPERLESS_URL}/api/tags/`, {
+      headers: { 'Authorization': `Token ${token}` }
+    });
+
+    if (!response.ok) {
+      console.error('Failed to fetch tags:', response.status);
+      return [];
+    }
+
+    const data = await response.json();
+    const results = data.results || data;
+
+    // Filter out system tags, return family tags with document counts
+    return results
+      .filter(tag => !SYSTEM_TAGS.includes(tag.slug?.toLowerCase()))
+      .map(tag => ({
+        id: tag.id,
+        name: tag.name,
+        slug: tag.slug,
+        document_count: tag.document_count || 0
+      }));
+  } catch (err) {
+    console.error('Error fetching families:', err.message);
+    return [];
+  }
+}
+
+/**
+ * Sync/create user from Paperless authentication
+ * @param {Object} paperlessUser - User info from Paperless
+ * @param {string} paperlessToken - Paperless API token
+ * @returns {Promise<Object>} Local user record
+ */
+async function syncUserFromPaperless(paperlessUser, paperlessToken) {
+  // Check if user already exists by Paperless user ID
+  const { rows: existingUsers } = await db.query(
+    `SELECT id, paperless_user_id, paperless_username, display_name, role, created_at
+     FROM users WHERE paperless_user_id = $1`,
+    [paperlessUser.id]
+  );
+
+  if (existingUsers.length > 0) {
+    // Update existing user with new token and sync time
+    const { rows } = await db.query(
+      `UPDATE users
+       SET paperless_token = $1,
+           paperless_username = $2,
+           display_name = COALESCE($3, display_name),
+           last_synced_at = NOW()
+       WHERE paperless_user_id = $4
+       RETURNING id, paperless_user_id, paperless_username, display_name, role, created_at`,
+      [paperlessToken, paperlessUser.username, paperlessUser.displayName, paperlessUser.id]
+    );
+    return rows[0];
+  }
+
+  // Create new user
+  const role = paperlessUser.isSuperuser ? 'admin' : 'user';
+  const { rows } = await db.query(
+    `INSERT INTO users (paperless_user_id, paperless_username, paperless_token, display_name, role, last_synced_at)
+     VALUES ($1, $2, $3, $4, $5, NOW())
+     RETURNING id, paperless_user_id, paperless_username, display_name, role, created_at`,
+    [paperlessUser.id, paperlessUser.username, paperlessToken, paperlessUser.displayName, role]
+  );
+
+  return rows[0];
 }
 
 /**
  * Generate an access token (JWT)
- * @param {Object} user - User object with id, email, family_id, role
+ * @param {Object} user - User object with id, paperless_username, role
+ * @param {boolean} rememberMe - If true, extend expiry to 30 days
  * @returns {string} JWT access token
  */
-function generateAccessToken(user) {
+function generateAccessToken(user, rememberMe = false) {
   return jwt.sign(
     {
       userId: user.id,
-      email: user.email,
-      familyId: user.family_id,
+      paperlessUserId: user.paperless_user_id,
+      paperlessUsername: user.paperless_username,
       role: user.role,
       displayName: user.display_name
     },
     JWT_SECRET,
-    { expiresIn: ACCESS_TOKEN_EXPIRY }
+    { expiresIn: rememberMe ? REMEMBER_ME_EXPIRY : ACCESS_TOKEN_EXPIRY }
   );
 }
 
@@ -215,7 +331,7 @@ async function cleanupExpiredSessions() {
  */
 async function getUserById(userId) {
   const { rows } = await db.query(
-    `SELECT id, email, family_id, display_name, role, created_at
+    `SELECT id, paperless_user_id, paperless_username, paperless_token, display_name, role, created_at, last_synced_at
      FROM users WHERE id = $1`,
     [userId]
   );
@@ -223,40 +339,24 @@ async function getUserById(userId) {
 }
 
 /**
- * Get user by email
- * @param {string} email - User email
- * @returns {Promise<Object|null>} User with password_hash included
+ * Get user by Paperless username
+ * @param {string} username - Paperless username
+ * @returns {Promise<Object|null>}
  */
-async function getUserByEmail(email) {
+async function getUserByPaperlessUsername(username) {
   const { rows } = await db.query(
-    `SELECT id, email, password_hash, family_id, display_name, role, created_at
-     FROM users WHERE email = $1`,
-    [email.toLowerCase()]
+    `SELECT id, paperless_user_id, paperless_username, paperless_token, display_name, role, created_at, last_synced_at
+     FROM users WHERE paperless_username = $1`,
+    [username.toLowerCase()]
   );
   return rows[0] || null;
 }
 
-/**
- * Create a new user
- * @param {Object} userData - User data
- * @returns {Promise<Object>} Created user (without password_hash)
- */
-async function createUser({ email, password, familyId, displayName }) {
-  const passwordHash = await hashPassword(password);
-
-  const { rows } = await db.query(
-    `INSERT INTO users (email, password_hash, family_id, display_name)
-     VALUES ($1, $2, $3, $4)
-     RETURNING id, email, family_id, display_name, role, created_at`,
-    [email.toLowerCase(), passwordHash, familyId, displayName || null]
-  );
-
-  return rows[0];
-}
-
 module.exports = {
-  hashPassword,
-  verifyPassword,
+  verifyPaperlessCredentials,
+  fetchPaperlessUser,
+  fetchUserFamilies,
+  syncUserFromPaperless,
   generateAccessToken,
   verifyAccessToken,
   generateRefreshToken,
@@ -266,7 +366,6 @@ module.exports = {
   invalidateAllUserSessions,
   cleanupExpiredSessions,
   getUserById,
-  getUserByEmail,
-  createUser,
+  getUserByPaperlessUsername,
   redis
 };

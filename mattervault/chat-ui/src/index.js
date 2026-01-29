@@ -69,9 +69,78 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, '../public/index.html'));
 });
 
-// Health check endpoint (public)
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+// Enhanced health check endpoint (public)
+app.get('/health', async (req, res) => {
+  const db = require('./db');
+  const { redis } = require('./auth');
+
+  const health = {
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    services: {
+      database: false,
+      redis: false
+    },
+    metrics: {
+      conversation_count: 0,
+      message_count: 0,
+      active_sessions: 0,
+      last_query_at: null
+    }
+  };
+
+  // Check database connection
+  try {
+    const dbHealthy = await db.healthCheck();
+    health.services.database = dbHealthy;
+
+    if (dbHealthy) {
+      // Get conversation count
+      const convResult = await db.query('SELECT COUNT(*) as count FROM conversations');
+      health.metrics.conversation_count = parseInt(convResult.rows[0].count);
+
+      // Get message count
+      const msgResult = await db.query('SELECT COUNT(*) as count FROM messages');
+      health.metrics.message_count = parseInt(msgResult.rows[0].count);
+
+      // Get active sessions count (non-expired)
+      const sessionResult = await db.query(
+        'SELECT COUNT(*) as count FROM sessions WHERE expires_at > NOW()'
+      );
+      health.metrics.active_sessions = parseInt(sessionResult.rows[0].count);
+
+      // Get last chat query timestamp from audit logs
+      try {
+        const auditResult = await db.query(
+          'SELECT created_at FROM audit.chat_query_logs ORDER BY created_at DESC LIMIT 1'
+        );
+        if (auditResult.rows.length > 0) {
+          health.metrics.last_query_at = auditResult.rows[0].created_at;
+        }
+      } catch (auditErr) {
+        // Audit table might not exist yet
+        health.metrics.last_query_at = null;
+      }
+    }
+  } catch (err) {
+    health.services.database = false;
+    console.error('Health check DB error:', err.message);
+  }
+
+  // Check Redis connection
+  try {
+    const pingResult = await redis.ping();
+    health.services.redis = pingResult === 'PONG';
+  } catch (err) {
+    health.services.redis = false;
+    console.error('Health check Redis error:', err.message);
+  }
+
+  // Overall status
+  health.status = (health.services.database && health.services.redis) ? 'ok' : 'degraded';
+
+  const httpStatus = health.status === 'ok' ? 200 : 503;
+  res.status(httpStatus).json(health);
 });
 
 // Start server with database initialization

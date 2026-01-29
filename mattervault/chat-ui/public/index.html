@@ -444,6 +444,13 @@
       transform: translateX(14px);
     }
 
+    /* Document count */
+    .doc-count {
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      margin-left: 10px;
+    }
+
     /* Family selector locked state */
     .family-selector.locked {
       position: relative;
@@ -470,28 +477,6 @@
       z-index: 2;
     }
 
-    .family-selector.locked .lock-tooltip {
-      position: absolute;
-      bottom: -28px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: var(--bg-card);
-      border: 1px solid var(--border-subtle);
-      border-radius: 6px;
-      padding: 4px 8px;
-      font-size: 0.75rem;
-      color: var(--text-muted);
-      white-space: nowrap;
-      opacity: 0;
-      visibility: hidden;
-      transition: opacity 0.2s ease, visibility 0.2s ease;
-      z-index: 10;
-    }
-
-    .family-selector.locked:hover .lock-tooltip {
-      opacity: 1;
-      visibility: visible;
-    }
   </style>
 </head>
 <body>
@@ -553,9 +538,8 @@
             <select id="familySelect" disabled>
               <option value="">Loading families...</option>
             </select>
-            <span class="doc-count" id="docCount" style="display: none;"></span>
-            <span class="lock-tooltip">Start a New Chat to change family</span>
           </div>
+          <span class="doc-count" id="docCount" style="display: none;"></span>
           <div class="export-dropdown" id="exportDropdown">
             <button class="export-btn" id="exportBtn" title="Export conversation">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -615,11 +599,6 @@
         <div class="input-area">
           <div class="input-wrapper">
             <input type="text" id="questionInput" placeholder="Type your question..." disabled>
-            <label class="streaming-toggle active" id="streamingToggle" title="Toggle streaming responses">
-              <input type="checkbox" id="streamingCheckbox" checked>
-              <span class="toggle-indicator"></span>
-              <span>Stream</span>
-            </label>
             <button id="sendBtn" disabled>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
@@ -689,8 +668,8 @@
   <div class="doc-preview-overlay" id="docPreviewOverlay"></div>
 
   <script>
-    // Auth state
-    let accessToken = sessionStorage.getItem('accessToken');
+    // Auth state (check both storage locations - localStorage for "remember me", sessionStorage for regular)
+    let accessToken = localStorage.getItem('accessToken') || sessionStorage.getItem('accessToken');
     let currentUser = null;
 
     // State
@@ -730,8 +709,7 @@
     const exportBtn = document.getElementById('exportBtn');
     const exportMarkdown = document.getElementById('exportMarkdown');
     const exportPdf = document.getElementById('exportPdf');
-    const streamingToggle = document.getElementById('streamingToggle');
-    const streamingCheckbox = document.getElementById('streamingCheckbox');
+    // Streaming is always enabled (professional loading phrases)
 
     // Document preview elements
     const docPreviewPanel = document.getElementById('docPreviewPanel');
@@ -822,7 +800,9 @@
           return true;
         }
 
-        // Refresh failed, clear storage
+        // Refresh failed, clear storage (both locations)
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('user');
         sessionStorage.removeItem('accessToken');
         sessionStorage.removeItem('user');
         return false;
@@ -1094,13 +1074,6 @@
         }
       });
 
-      // Streaming toggle
-      streamingToggle.addEventListener('click', () => {
-        useStreaming = !useStreaming;
-        streamingCheckbox.checked = useStreaming;
-        streamingToggle.classList.toggle('active', useStreaming);
-      });
-
       // Document preview panel
       docPreviewClose.addEventListener('click', closeDocPreview);
       docPreviewOverlay.addEventListener('click', closeDocPreview);
@@ -1157,7 +1130,9 @@
         console.error('Logout error:', err);
       }
 
-      // Clear storage and redirect
+      // Clear storage and redirect (both locations)
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('user');
       sessionStorage.removeItem('accessToken');
       sessionStorage.removeItem('user');
       window.location.href = '/login.html';
@@ -1403,6 +1378,10 @@
                     break;
 
                   case 'complete':
+                    // Set the full response text from n8n output
+                    if (parsed.output) {
+                      fullText = parsed.output;
+                    }
                     // Finalize message
                     if (parsed.conversation_id && !currentConversationId) {
                       currentConversationId = parsed.conversation_id;

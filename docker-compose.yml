@@ -1,28 +1,30 @@
+# D:\CCC\docker-compose.yml
 services:
   claude-client:
     build: .
-    container_name: claude-orchestrator
+    container_name: claude-god-mode
     tty: true
     stdin_open: true
-
+    
+    # Port 3005 is strictly for "Quick Tests" (e.g. if Claude runs 'node server.js' 
+    # directly in the terminal before building the final dashboard container).
     ports:
-      - "3005:3000"  # Expose the dashboard port
-
+      - "3005:3000"
+      
     volumes:
-      # 1. YOUR CODE (Maps to Windows D:\CCC)
+      # 1. THE STUDIO ROOT: Gives Claude access to /dashboard AND /mattervault
       - D:\CCC:/workspace
-
-      # 2. YOUR CLAUDE BRAIN (Persists login, history, plugins)
+      
+      # 2. THE BRAIN: Persists your login and chat history
       - claude_config:/root/.claude
-
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+      
+      # 3. GOD MODE: Gives Claude control over your Windows Docker Engine
+      - /var/run/docker.sock:/var/run/docker.sock
 
     networks:
       - default
       - matter_bridge
 
-# Define the volume name here
 volumes:
   claude_config:
 
@@ -30,4 +32,5 @@ networks:
   default:
   matter_bridge:
     external: true
+    # Make sure this matches your existing Mattervault network name exactly
     name: mattervault_matternet

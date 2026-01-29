@@ -113,11 +113,16 @@
       transform: translateY(-1px);
     }
 
-    .auth-btn:disabled {
-      background: var(--text-muted);
-      cursor: not-allowed;
-      opacity: 0.6;
-    }
+/* Glowing Loading State for Button */
+.auth-btn:disabled {
+  /* Maintains the teal theme instead of turning gray */
+  background: var(--accent-teal);
+  cursor: wait;
+  opacity: 0.85;
+  /* Adds the signature glow effect during processing */
+  box-shadow: 0 0 20px var(--accent-teal-glow);
+  transform: scale(0.98);
+}
 
     .auth-footer {
       text-align: center;
@@ -158,21 +163,82 @@
       animation: fadeSlideDown 0.3s ease-out;
     }
 
-    .loading-spinner {
-      display: inline-block;
-      width: 16px;
-      height: 16px;
-      border: 2px solid transparent;
-      border-top-color: var(--bg-deep);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-      margin-right: 8px;
-      vertical-align: middle;
-    }
+/* Enhanced Loading Spinner */
+.loading-spinner {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  /* Uses a semi-transparent track for a more refined look */
+  border: 2px solid rgba(10, 14, 26, 0.1); 
+  border-top-color: var(--bg-deep); /* Contrast against the teal button */
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  margin-right: 10px;
+  vertical-align: middle;
+}
 
     @keyframes spin {
       to { transform: rotate(360deg); }
     }
+
+/* Animated Custom Checkbox */
+.remember-me label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  user-select: none;
+}
+
+.remember-me input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  /* Grid centering ensures the check is perfectly dead-center */
+  display: grid;
+  place-content: center;
+}
+
+.remember-me input[type="checkbox"]:hover {
+  border-color: var(--accent-blue);
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.remember-me input[type="checkbox"]:checked {
+  background: rgba(0, 212, 170, 0.1);
+  border-color: var(--accent-teal);
+  box-shadow: 0 0 12px var(--accent-teal-glow);
+}
+
+/* The Proportional Checkmark with Pop Animation */
+.remember-me input[type="checkbox"]::after {
+  content: "";
+  width: 10px;
+  height: 6px;
+  border: solid var(--accent-teal);
+  border-width: 0 0 2.5px 2.5px;
+  /* Combined rotation, optical centering, and initial hidden scale */
+  transform: translateY(-1px) rotate(-45deg) scale(0);
+  opacity: 0;
+  /* Cubic-bezier provides the "snappy" pop effect */
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.1s ease;
+}
+
+.remember-me input[type="checkbox"]:checked::after {
+  opacity: 1;
+  /* Scales up to full size when checked */
+  transform: translateY(-1px) rotate(-45deg) scale(1);
+}
   </style>
 </head>
 <body>
@@ -181,15 +247,15 @@
       <div class="auth-header">
         <div class="brand-label">Document Intelligence</div>
         <h1>mattervault</h1>
-        <p>Sign in to your account</p>
+        <p>Sign in with your Paperless account</p>
       </div>
 
       <div class="error-message" id="errorMessage"></div>
 
       <form id="loginForm">
         <div class="form-group">
-          <label for="email">Email</label>
-          <input type="email" id="email" name="email" placeholder="you@example.com" required autocomplete="email">
+          <label for="username">Username</label>
+          <input type="text" id="username" name="username" placeholder="Your Paperless username" required autocomplete="username">
         </div>
 
         <div class="form-group">
@@ -197,20 +263,23 @@
           <input type="password" id="password" name="password" placeholder="Enter your password" required autocomplete="current-password">
         </div>
 
+        <div class="form-group remember-me">
+          <label>
+            <input type="checkbox" id="rememberMe" name="rememberMe">
+            Keep me signed in
+          </label>
+        </div>
+
         <button type="submit" class="auth-btn" id="submitBtn">
           Sign In
         </button>
       </form>
-
-      <div class="auth-footer">
-        <p>Don't have an account? <a href="/register.html">Create one</a></p>
-      </div>
     </div>
   </div>
 
   <script>
-    // Check if already logged in
-    const accessToken = sessionStorage.getItem('accessToken');
+    // Check if already logged in (check both storage locations)
+    const accessToken = localStorage.getItem('accessToken') || sessionStorage.getItem('accessToken');
     if (accessToken) {
       window.location.href = '/';
     }
@@ -222,8 +291,9 @@
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
 
-      const email = document.getElementById('email').value;
+      const username = document.getElementById('username').value;
       const password = document.getElementById('password').value;
+      const rememberMe = document.getElementById('rememberMe').checked;
 
       // Hide previous errors
       errorMessage.classList.remove('visible');
@@ -236,16 +306,17 @@
         const res = await fetch('/api/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password }),
+          body: JSON.stringify({ username, password, rememberMe }),
           credentials: 'include' // Include cookies
         });
 
         const data = await res.json();
 
         if (res.ok) {
-          // Store access token in sessionStorage (memory-like, cleared on tab close)
-          sessionStorage.setItem('accessToken', data.accessToken);
-          sessionStorage.setItem('user', JSON.stringify(data.user));
+          // Store access token - localStorage if rememberMe, sessionStorage otherwise
+          const storage = rememberMe ? localStorage : sessionStorage;
+          storage.setItem('accessToken', data.accessToken);
+          storage.setItem('user', JSON.stringify(data.user));
 
           // Redirect to main app
           window.location.href = '/';
