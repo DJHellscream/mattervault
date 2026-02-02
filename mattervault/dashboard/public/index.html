@@ -510,7 +510,9 @@
       badge.classList.add('has-alerts');
 
       list.innerHTML = alertsData.slice(0, 10).map(alert => {
-        const time = new Date(alert.timestamp).toLocaleTimeString();
+        const dt = new Date(alert.timestamp);
+        const datetime = dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) +
+                        ' ' + dt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
         return `
           <div class="alert-item ${alert.severity}">
             <div class="alert-severity ${alert.severity}">${alert.severity}</div>
@@ -518,7 +520,7 @@
               <span class="alert-service">${alert.service}</span>
               <span class="alert-message">${alert.message}</span>
             </div>
-            <div class="alert-time">${time}</div>
+            <div class="alert-time">${datetime}</div>
           </div>
         `;
       }).join('');
