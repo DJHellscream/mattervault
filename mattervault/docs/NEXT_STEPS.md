@@ -11,6 +11,7 @@
 - CLAUDE.md documentation update
 - Admin UI for audit logs (with role sync from Paperless)
 - Mobile Chat UI (responsive layout, touch gestures, icon-only header on small screens)
+- Document change/delete sync (Qdrant ↔ Paperless reconciliation)
 
 ---
 
@@ -35,14 +36,6 @@
 - Proper secrets management (not .env files)
 - Rate limiting on chat API
 
-### Data Integrity
-
-**Document Change/Delete Sync**
-- When documents are modified in Paperless, re-ingest to update vectors
-- When documents are deleted in Paperless, remove from Qdrant
-- Paperless webhooks can trigger n8n workflows for sync
-- Critical for keeping vector store consistent with source of truth
-
 ---
 
 ## Decision Factors
@@ -52,7 +45,6 @@
 | Email alerting | Low | High | SMTP config |
 | Per-family access | High | Medium | Paperless permissions setup |
 | Production hardening | Medium | High | Domain, certs |
-| Document change/delete sync | Medium | High | Paperless webhook config |
 
 ---
 

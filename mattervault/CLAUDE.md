@@ -193,7 +193,55 @@ GET /api/audit/query/:correlationId
 | Audit Partition Maintenance | Monthly | Create future partitions |
 | Audit Archive (7-Year) | Monthly | Archive old partitions to JSONL |
 
-## 7. n8n Workflows
+## 7. Document Sync
+
+MatterVault keeps Qdrant vectors synchronized with Paperless using a hybrid approach.
+
+### Sync Methods
+
+| Event | Method | Latency |
+|-------|--------|---------|
+| Document Added | Webhook | Instant |
+| Document Updated | Webhook | Instant |
+| Document Deleted | Reconciliation | ≤15 min |
+
+### How It Works
+
+1. **Real-time**: Paperless workflows trigger n8n webhooks for adds/updates
+2. **Idempotent Ingestion**: Every ingestion deletes existing chunks first (safe to re-run)
+3. **Scheduled Reconciliation**: Every 15 minutes, compares Paperless vs Qdrant
+   - Deletes orphans (in Qdrant, not in Paperless)
+   - Ingests missing (in Paperless, not in Qdrant)
+4. **Weekly Full Scan**: Sunday 2 AM, full comparison regardless of timestamps
+
+### Configuration
+
+```bash
+# .env
+SYNC_RECONCILIATION_INTERVAL_MINUTES=15  # How often to check for deletes
+SYNC_FULL_SCAN_CRON=0 2 * * 0            # Weekly full scan schedule
+SYNC_FALLBACK_WINDOW_HOURS=2             # Fallback if no high-water mark
+```
+
+### Monitoring
+
+```sql
+-- Recent reconciliation runs
+SELECT * FROM sync.reconciliation_state ORDER BY started_at DESC LIMIT 10;
+
+-- Operations log
+SELECT * FROM sync.reconciliation_log WHERE created_at > NOW() - INTERVAL '1 day';
+```
+
+### Troubleshooting
+
+| Issue | Check |
+|-------|-------|
+| Document not syncing | Paperless workflow enabled? Check n8n executions |
+| Deleted doc still in chat | Wait for reconciliation or trigger manually |
+| Duplicates in Qdrant | Check delete step in ingestion workflow |
+
+## 8. n8n Workflows
 
 ### Active Workflows
 
@@ -203,6 +251,7 @@ GET /api/audit/query/:correlationId
 | Mattervault Chat V5 (With Persistence) | `wHoLnYdlFJoaHfDZ` | Chat API with history + audit |
 | Audit Partition Maintenance | `SPDqGNXbYC6J4aKX` | Monthly partition creation |
 | Audit Archive (7-Year Retention) | `GkM7qDYrqrAQeAyv` | Archive old data |
+| Document Reconciliation (Sync) | `qmC66Y7q2qYPOfN6` | Scheduled sync + delete detection |
 
 ### Updating Workflows
 
@@ -222,7 +271,7 @@ docker restart matterlogic
 
 **Critical**: Never remove or change the `"id"` field in workflow JSON files.
 
-## 8. Models
+## 9. Models
 
 | Purpose | Model | Dimensions |
 |---------|-------|------------|
@@ -230,7 +279,7 @@ docker restart matterlogic
 | Chat/Generation | `llama3.1:8b` | - |
 | Reranking | `llama3.1:8b` | - |
 
-## 9. File Structure
+## 10. File Structure
 
 ```
 /mattervault
@@ -261,7 +310,7 @@ docker restart matterlogic
 └── /paperless                  # Paperless volumes
 ```
 
-## 10. Health Dashboard
+## 11. Health Dashboard
 
 The health dashboard (`mattervault-dashboard:3006`) monitors all services.
 
@@ -284,7 +333,7 @@ GET /api/alerts          # Recent alerts
 WebSocket /ws            # Real-time updates
 ```
 
-## 11. Development
+## 12. Development
 
 ### Starting Services
 
@@ -319,7 +368,7 @@ docker exec e2e-runner /e2e/test.sh quick
 | n8n | http://localhost:5678 |
 | Qdrant | http://localhost:6333/dashboard |
 
-## 12. Security
+## 13. Security
 
 - NO external API calls for AI (everything local)
 - NO cloud storage integrations
@@ -328,13 +377,13 @@ docker exec e2e-runner /e2e/test.sh quick
 - SQL injection protection via parameterized queries + escaping
 - JWT tokens with Redis session validation
 
-## 13. Known Issues
+## 14. Known Issues
 
 - Docling may timeout on PDFs >50 pages
 - Paperless webhooks require restart after n8n URL change
 - Ollama must run with `OLLAMA_HOST=0.0.0.0` on Windows
 
-## 14. Quick Reference
+## 15. Quick Reference
 
 ### Container Names
 
