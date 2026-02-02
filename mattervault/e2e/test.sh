@@ -288,7 +288,7 @@ do_sync_tests() {
             -H "Content-Type: application/json" \
             -d "{\"doc_url\":\"http://paperless:8000/api/documents/$DOC_ID/\"}" >/dev/null
 
-        sleep 30  # Wait for ingestion
+        sleep 60  # Wait for ingestion (Docling parsing + embedding can take time)
 
         AFTER_COUNT=$(curl -sf "$QDRANT_URL/collections/mattervault_documents_v2" | jq -r '.result.points_count')
 
