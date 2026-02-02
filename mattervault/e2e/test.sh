@@ -388,7 +388,7 @@ do_audit_tests() {
         -H "Content-Type: application/json" \
         -d "{\"username\":\"$PAPERLESS_USER\",\"password\":\"$PAPERLESS_PASS\"}" 2>&1 || echo '{"error":"failed"}')
 
-    CHATUI_TOKEN=$(echo "$LOGIN_RESPONSE" | jq -r '.token // empty')
+    CHATUI_TOKEN=$(echo "$LOGIN_RESPONSE" | jq -r '.accessToken // empty')
 
     if [ -n "$CHATUI_TOKEN" ] && [ "$CHATUI_TOKEN" != "null" ]; then
         pass "ChatUI admin authentication"
