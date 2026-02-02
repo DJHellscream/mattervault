@@ -190,6 +190,10 @@ services:
       N8N_RUNNERS_DISABLED: false
       N8N_PUBLIC_API_ENABLED: "true"
       # Note: Ollama model config is now in the workflow's Config node, not env vars
+      # Document Sync Configuration
+      SYNC_RECONCILIATION_INTERVAL_MINUTES: ${SYNC_RECONCILIATION_INTERVAL_MINUTES:-15}
+      SYNC_FULL_SCAN_CRON: ${SYNC_FULL_SCAN_CRON:-0 2 * * 0}
+      SYNC_FALLBACK_WINDOW_HOURS: ${SYNC_FALLBACK_WINDOW_HOURS:-2}
     volumes:
       - n8n_data:/home/node/.n8n
       - D:\CCC\mattervault\intake:/files/intake:ro  # Triggers
