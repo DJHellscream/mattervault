@@ -197,6 +197,31 @@
       "credentials": {
         "postgres": { "id": "chatui-db", "name": "ChatUI Database" }
       }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Merge results from all branches\nconst compareData = $('Compare Document Sets').first().json;\nconst runId = compareData.run_id;\nconst startTime = compareData.start_time;\nconst orphanCount = compareData.orphans.length;\nconst missingCount = compareData.missing.length;\nconst totalChecked = compareData.paperless_count;\n\nreturn [{ json: {\n  run_id: runId,\n  start_time: startTime,\n  documents_checked: totalChecked,\n  documents_deleted: orphanCount,\n  documents_ingested: missingCount\n}}];"
+      },
+      "id": "code-aggregate",
+      "name": "Aggregate Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2050, 375]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=SELECT sync.complete_reconciliation({{ $json.run_id }}, 'success', '{{ $json.start_time }}'::timestamptz, {{ $json.documents_checked }}, {{ $json.documents_deleted }}, {{ $json.documents_ingested }})",
+        "options": {}
+      },
+      "id": "db-complete-run",
+      "name": "Complete Run",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [2250, 375],
+      "credentials": {
+        "postgres": { "id": "chatui-db", "name": "ChatUI Database" }
+      }
     }
   ],
   "connections": {
@@ -227,7 +252,7 @@
     "Has Orphans?": {
       "main": [
         [{ "node": "Split Orphans", "type": "main", "index": 0 }],
-        []
+        [{ "node": "Aggregate Results", "type": "main", "index": 0 }]
       ]
     },
     "Split Orphans": {
@@ -239,7 +264,7 @@
     "Has Missing?": {
       "main": [
         [{ "node": "Split Missing", "type": "main", "index": 0 }],
-        []
+        [{ "node": "Aggregate Results", "type": "main", "index": 0 }]
       ]
     },
     "Split Missing": {
@@ -247,12 +272,22 @@
     },
     "Trigger Ingestion": {
       "main": [[{ "node": "Log Ingest", "type": "main", "index": 0 }]]
+    },
+    "Log Delete": {
+      "main": [[{ "node": "Aggregate Results", "type": "main", "index": 0 }]]
+    },
+    "Log Ingest": {
+      "main": [[{ "node": "Aggregate Results", "type": "main", "index": 0 }]]
+    },
+    "Aggregate Results": {
+      "main": [[{ "node": "Complete Run", "type": "main", "index": 0 }]]
     }
   },
   "settings": {
     "executionOrder": "v1",
     "saveManualExecutions": true,
     "callerPolicy": "workflowsFromSameOwner",
-    "maxRunTime": 900
+    "maxRunTime": 900,
+    "maxConcurrency": 1
   }
 }
