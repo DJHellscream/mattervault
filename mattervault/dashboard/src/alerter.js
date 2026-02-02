@@ -173,12 +173,41 @@ class Alerter {
       case 'file':
         this.sendToFile(alert);
         break;
+      case 'webhook':
+        await this.sendToWebhook(alert);
+        break;
       case 'email':
-        // TODO: Implement email transport
-        console.log('[ALERT] Email transport not yet implemented');
+        // Deprecated: Use 'webhook' transport with n8n instead
+        console.log('[ALERT] Use webhook transport for email alerts via n8n');
         break;
       default:
         console.warn(`Unknown alert transport: ${transport}`);
+    }
+  }
+
+  /**
+   * Webhook transport - POST alert to n8n for email/notifications
+   */
+  async sendToWebhook(alert) {
+    const webhookUrl = process.env.ALERT_WEBHOOK_URL;
+
+    if (!webhookUrl) {
+      console.warn('[ALERT] Webhook transport enabled but ALERT_WEBHOOK_URL not set');
+      return;
+    }
+
+    try {
+      const response = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(alert)
+      });
+
+      if (!response.ok) {
+        console.error(`[ALERT] Webhook failed: ${response.status} ${response.statusText}`);
+      }
+    } catch (err) {
+      console.error(`[ALERT] Webhook error: ${err.message}`);
     }
   }
 

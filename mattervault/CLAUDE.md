@@ -259,6 +259,7 @@ SELECT * FROM sync.reconciliation_log WHERE created_at > NOW() - INTERVAL '1 day
 | `document-reconciliation.json` | Document Reconciliation (Sync) |
 | `audit-partition-maintenance.json` | Audit Partition Maintenance |
 | `audit-archive.json` | Audit Archive (7-Year Retention) |
+| `system-alerts.json` | System Alerts (Email) - optional |
 
 ### Updating Workflows
 
@@ -339,6 +340,44 @@ GET /api/metrics         # All metrics with summary
 GET /api/alerts          # Recent alerts
 WebSocket /ws            # Real-time updates
 ```
+
+### Alerting
+
+The dashboard sends alerts via webhook to n8n, which handles email delivery.
+
+**Alert Flow:**
+```
+Dashboard detects issue → POST to n8n webhook → n8n sends email
+```
+
+**Built-in Alert Rules:**
+| Rule | Severity | Condition |
+|------|----------|-----------|
+| Service Down | Critical | Any service status = down |
+| Qdrant Empty | Critical | Vector count = 0 |
+| Paperless Empty | Warning | Document count = 0 |
+| ChatUI DB Down | Critical | Database connection failed |
+| ChatUI Redis Down | Warning | Redis connection failed |
+| High Redis Memory | Warning | Memory > 500MB |
+
+**Setup Email Alerts:**
+
+1. Import the System Alerts workflow in n8n:
+   ```bash
+   docker cp n8n-workflows/system-alerts.json matterlogic:/tmp/
+   docker exec matterlogic n8n import:workflow --input=/tmp/system-alerts.json
+   docker restart matterlogic
+   ```
+
+2. Configure SMTP credentials in n8n UI (Settings → Credentials → Add SMTP)
+
+3. Set environment variables in n8n:
+   - `ALERT_TO_EMAIL` - recipient email address
+   - `ALERT_FROM_EMAIL` - sender email address
+
+4. Activate the "System Alerts (Email)" workflow in n8n
+
+**Cooldown:** Alerts are rate-limited to prevent spam (default: 5 minutes per rule/service).
 
 ## 12. Development
 

@@ -13,17 +13,15 @@
 - Mobile Chat UI (responsive layout, touch gestures, icon-only header on small screens)
 - Document change/delete sync (Qdrant ↔ Paperless reconciliation)
 - Audit system E2E tests (schema, partitions, API endpoints)
+- Initialization script (scripts/init-mattervault.sh)
+- Dashboard consolidated into main docker-compose
+- Email alerting via n8n webhook (dashboard → n8n → SMTP)
 
 ---
 
 ## Potential Next Steps
 
 ### Features
-
-**Email Alerting**
-- Send alerts via email when services go down
-- Dashboard already tracks alerts, just needs email transport
-- Could use SMTP or a service like SendGrid
 
 **Per-Family Access Control**
 - Currently open access (any user can query any family)
@@ -43,7 +41,6 @@
 
 | Task | Effort | Impact | Dependencies |
 |------|--------|--------|--------------|
-| Email alerting | Low | High | SMTP config |
 | Per-family access | High | Medium | Paperless permissions setup |
 | Production hardening | Medium | High | Domain, certs |
 

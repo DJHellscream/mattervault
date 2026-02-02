@@ -264,6 +264,8 @@ services:
     container_name: mattervault-dashboard
     ports:
       - "3006:3000"
+    environment:
+      - ALERT_WEBHOOK_URL=${ALERT_WEBHOOK_URL:-http://matterlogic:5678/webhook/system-alert}
     volumes:
       - dashboard_data:/app/data
     extra_hosts:

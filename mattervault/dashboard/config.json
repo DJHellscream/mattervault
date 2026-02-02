@@ -113,7 +113,7 @@
   ],
   "alerts": {
     "enabled": true,
-    "transports": ["console", "file"],
+    "transports": ["console", "file", "webhook"],
     "cooldownMinutes": 5
   },
   "intervals": {

@@ -1,0 +1,120 @@
+{
+  "name": "System Alerts (Email)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "system-alert",
+        "options": {
+          "responseMode": "onReceived"
+        }
+      },
+      "id": "webhook-trigger",
+      "name": "Alert Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300],
+      "webhookId": "system-alert"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format alert for email\nconst alert = $input.first().json;\n\nconst severityEmoji = {\n  critical: '🔴',\n  warning: '🟡',\n  info: '🔵'\n};\n\nconst emoji = severityEmoji[alert.severity] || '⚪';\n\nconst subject = `${emoji} [${alert.severity.toUpperCase()}] ${alert.serviceName}: ${alert.message}`;\n\nconst body = `\n<h2>${emoji} MatterVault System Alert</h2>\n\n<table style=\"border-collapse: collapse; width: 100%; max-width: 600px;\">\n  <tr>\n    <td style=\"padding: 8px; border: 1px solid #ddd; font-weight: bold;\">Severity</td>\n    <td style=\"padding: 8px; border: 1px solid #ddd;\">${alert.severity.toUpperCase()}</td>\n  </tr>\n  <tr>\n    <td style=\"padding: 8px; border: 1px solid #ddd; font-weight: bold;\">Service</td>\n    <td style=\"padding: 8px; border: 1px solid #ddd;\">${alert.serviceName}</td>\n  </tr>\n  <tr>\n    <td style=\"padding: 8px; border: 1px solid #ddd; font-weight: bold;\">Message</td>\n    <td style=\"padding: 8px; border: 1px solid #ddd;\">${alert.message}</td>\n  </tr>\n  <tr>\n    <td style=\"padding: 8px; border: 1px solid #ddd; font-weight: bold;\">Rule</td>\n    <td style=\"padding: 8px; border: 1px solid #ddd;\">${alert.ruleName}</td>\n  </tr>\n  <tr>\n    <td style=\"padding: 8px; border: 1px solid #ddd; font-weight: bold;\">Time</td>\n    <td style=\"padding: 8px; border: 1px solid #ddd;\">${alert.timestamp}</td>\n  </tr>\n</table>\n\n<p style=\"margin-top: 20px; color: #666; font-size: 12px;\">\n  This alert was sent by MatterVault Health Dashboard.\n</p>\n`;\n\nreturn [{\n  json: {\n    subject,\n    body,\n    severity: alert.severity,\n    serviceName: alert.serviceName,\n    originalAlert: alert\n  }\n}];"
+      },
+      "id": "format-alert",
+      "name": "Format Alert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "fromEmail": "={{ $env.ALERT_FROM_EMAIL || 'mattervault@localhost' }}",
+        "toEmail": "={{ $env.ALERT_TO_EMAIL || '' }}",
+        "subject": "={{ $json.subject }}",
+        "emailType": "html",
+        "html": "={{ $json.body }}",
+        "options": {}
+      },
+      "id": "send-email",
+      "name": "Send Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [650, 300],
+      "credentials": {
+        "smtp": {
+          "id": "smtp-credentials",
+          "name": "SMTP Credentials"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "check-email-configured",
+              "leftValue": "={{ $env.ALERT_TO_EMAIL }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-config",
+      "name": "Email Configured?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [450, 450]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Log that email is not configured\nconsole.log('Alert received but email not configured (ALERT_TO_EMAIL not set)');\nconsole.log('Alert:', JSON.stringify($input.first().json, null, 2));\n\nreturn [{ json: { status: 'skipped', reason: 'Email not configured' } }];"
+      },
+      "id": "log-skipped",
+      "name": "Log (No Email)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 450]
+    }
+  ],
+  "connections": {
+    "Alert Webhook": {
+      "main": [
+        [
+          { "node": "Format Alert", "type": "main", "index": 0 },
+          { "node": "Email Configured?", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Format Alert": {
+      "main": [
+        [{ "node": "Send Email", "type": "main", "index": 0 }]
+      ]
+    },
+    "Email Configured?": {
+      "main": [
+        [],
+        [{ "node": "Log (No Email)", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2026-02-02T20:00:00.000Z",
+  "versionId": "1"
+}
