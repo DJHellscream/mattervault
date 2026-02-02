@@ -37,6 +37,48 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://paperless:8000/api/documents/?page_size=1000&ordering=-modified",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": { "timeout": 60000 }
+      },
+      "id": "http-paperless-docs",
+      "name": "Fetch All Paperless Documents",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [850, 300],
+      "credentials": {
+        "httpHeaderAuth": { "id": "4TnejHYwv9j1gXko", "name": "Paperless API" }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://qdrant:6333/collections/mattervault_documents_v2/points/scroll",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"limit\": 10000,\n  \"with_payload\": [\"document_id\"],\n  \"with_vector\": false\n}",
+        "options": { "timeout": 60000 }
+      },
+      "id": "http-qdrant-docs",
+      "name": "Fetch All Qdrant Documents",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [850, 450]
+    },
+    {
+      "parameters": {
+        "jsCode": "const prepData = $('Prepare Reconciliation').first().json;\nconst paperlessResponse = $('Fetch All Paperless Documents').first().json;\nconst qdrantResponse = $('Fetch All Qdrant Documents').first().json;\n\n// Extract Paperless document IDs\nconst paperlessDocs = (paperlessResponse.results || []).map(d => ({\n  id: String(d.id),\n  title: d.title,\n  modified: d.modified\n}));\nconst paperlessIds = new Set(paperlessDocs.map(d => d.id));\n\n// Extract unique document IDs from Qdrant\nconst qdrantPoints = qdrantResponse.result?.points || [];\nconst qdrantDocIds = new Set();\nqdrantPoints.forEach(p => {\n  if (p.payload?.document_id) {\n    qdrantDocIds.add(String(p.payload.document_id));\n  }\n});\n\nconsole.log('Paperless docs:', paperlessIds.size);\nconsole.log('Qdrant doc IDs:', qdrantDocIds.size);\n\n// Find orphans (in Qdrant but not in Paperless)\nconst orphans = [];\nqdrantDocIds.forEach(id => {\n  if (!paperlessIds.has(id)) {\n    orphans.push({ document_id: id, action: 'delete' });\n  }\n});\n\n// Find missing (in Paperless but not in Qdrant)\nconst missing = [];\npaperlessDocs.forEach(doc => {\n  if (!qdrantDocIds.has(doc.id)) {\n    missing.push({ document_id: doc.id, title: doc.title, action: 'ingest' });\n  }\n});\n\nconsole.log('Orphans to delete:', orphans.length);\nconsole.log('Missing to ingest:', missing.length);\n\nreturn [{ json: {\n  run_id: prepData.run_id,\n  start_time: prepData.start_time,\n  paperless_count: paperlessIds.size,\n  qdrant_count: qdrantDocIds.size,\n  orphans: orphans,\n  missing: missing\n}}];"
+      },
+      "id": "code-compare",
+      "name": "Compare Document Sets",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1050, 375]
     }
   ],
   "connections": {
@@ -45,6 +87,18 @@
     },
     "Start Reconciliation Run": {
       "main": [[{ "node": "Prepare Reconciliation", "type": "main", "index": 0 }]]
+    },
+    "Prepare Reconciliation": {
+      "main": [[
+        { "node": "Fetch All Paperless Documents", "type": "main", "index": 0 },
+        { "node": "Fetch All Qdrant Documents", "type": "main", "index": 0 }
+      ]]
+    },
+    "Fetch All Paperless Documents": {
+      "main": [[{ "node": "Compare Document Sets", "type": "main", "index": 0 }]]
+    },
+    "Fetch All Qdrant Documents": {
+      "main": [[{ "node": "Compare Document Sets", "type": "main", "index": 0 }]]
     }
   },
   "settings": {
