@@ -102,6 +102,22 @@ User Question (Chat-UI)
 Response with Citations → Chat-UI → User
 ```
 
+### Citation Linking
+
+Chat responses include clickable citations that link directly to source documents:
+
+- **Page-level precision**: Citations show document title and page number (e.g., "Morrison Trust 2024, p.4")
+- **In-app PDF viewer**: Clicking a citation opens the PDF within Chat-UI (no context switch to Paperless)
+- **Document proxy**: Chat-UI proxies PDF requests through Paperless API with user's auth token
+- **Verification workflow**: Attorneys can immediately verify AI answers against source material
+
+Example citation in response:
+```
+The trust was executed on March 15, 2024 [Morrison Trust 2024, p.4]
+                                          ^^^^^^^^^^^^^^^^^^^^^^^^
+                                          Click → PDF viewer opens to page 4
+```
+
 ## 4. Authentication
 
 **Paperless-ngx is the identity provider.** Users authenticate with their Paperless credentials.
