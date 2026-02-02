@@ -403,7 +403,11 @@ docker exec e2e-runner /e2e/test.sh all
 | Qdrant | `mattermemory` |
 | Chat-UI | `mattervault-chat` |
 | Dashboard | `mattervault-dashboard` |
-| ChatUI DB | `mattervault-db-chatui` |
+| ChatUI DB | `matterdb-chatui` |
+| Paperless DB | `matterdb-paperless` |
+| n8n DB | `matterdb-n8n` |
+| Redis | `mattercache` |
+| E2E Runner | `e2e-runner` |
 
 ### Database Schemas
 
