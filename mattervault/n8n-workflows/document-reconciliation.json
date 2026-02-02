@@ -15,6 +15,19 @@
     },
     {
       "parameters": {
+        "httpMethod": "POST",
+        "path": "document-reconciliation",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Manual Trigger (Webhook)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 450],
+      "webhookId": "document-reconciliation"
+    },
+    {
+      "parameters": {
         "operation": "executeQuery",
         "query": "SELECT sync.start_reconciliation('incremental') as run_id, sync.get_last_high_water_mark() as last_hwm",
         "options": {}
@@ -226,6 +239,9 @@
   ],
   "connections": {
     "Every 15 Minutes": {
+      "main": [[{ "node": "Start Reconciliation Run", "type": "main", "index": 0 }]]
+    },
+    "Manual Trigger (Webhook)": {
       "main": [[{ "node": "Start Reconciliation Run", "type": "main", "index": 0 }]]
     },
     "Start Reconciliation Run": {

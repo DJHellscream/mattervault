@@ -251,7 +251,7 @@ SELECT * FROM sync.reconciliation_log WHERE created_at > NOW() - INTERVAL '1 day
 | Mattervault Chat V5 (With Persistence) | `wHoLnYdlFJoaHfDZ` | Chat API with history + audit |
 | Audit Partition Maintenance | `SPDqGNXbYC6J4aKX` | Monthly partition creation |
 | Audit Archive (7-Year Retention) | `GkM7qDYrqrAQeAyv` | Archive old data |
-| Document Reconciliation (Sync) | `TBD` | Scheduled sync + delete detection |
+| Document Reconciliation (Sync) | `qmC66Y7q2qYPOfN6` | Scheduled sync + delete detection |
 
 ### Updating Workflows
 
