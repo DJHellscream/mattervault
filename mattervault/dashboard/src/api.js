@@ -118,6 +118,16 @@ function createApiRouter(storage, config, scheduler, healthChecker, broadcast, a
     res.json({ alerts });
   });
 
+  // DELETE /api/alerts - clear all alerts
+  router.delete('/alerts', (req, res) => {
+    if (alerter) {
+      alerter.clearAlerts();
+      res.json({ success: true, message: 'Alerts cleared' });
+    } else {
+      res.status(500).json({ success: false, message: 'Alerter not available' });
+    }
+  });
+
   // GET /api/config - current configuration
   router.get('/config', (req, res) => {
     // Don't expose passwords

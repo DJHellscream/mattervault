@@ -284,6 +284,20 @@ class Alerter {
   }
 
   /**
+   * Clear all alerts from file
+   */
+  clearAlerts() {
+    try {
+      if (fs.existsSync(this.alertsFile)) {
+        fs.writeFileSync(this.alertsFile, '');
+        console.log('[ALERT] Alerts cleared');
+      }
+    } catch (err) {
+      console.error('Error clearing alerts file:', err.message);
+    }
+  }
+
+  /**
    * Clear old alerts from file (keep last N days)
    * @param {number} days - Number of days to keep
    */

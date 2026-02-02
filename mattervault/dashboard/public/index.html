@@ -124,6 +124,7 @@
         <span class="section-marker alert">⚠</span>
         <h2>ALERT LOG</h2>
         <span class="alert-badge" id="alertBadge">0</span>
+        <button class="clear-alerts-btn" id="clearAlertsBtn" onclick="clearAlerts()" title="Clear all alerts">✕ Clear</button>
       </div>
       <div class="alerts-list" id="alertsList">
         <div class="alert-empty">No recent alerts</div>
@@ -524,6 +525,21 @@
           </div>
         `;
       }).join('');
+    }
+
+    // Clear all alerts
+    async function clearAlerts() {
+      if (!confirm('Clear all alerts permanently?')) return;
+
+      try {
+        const res = await fetch('/api/alerts', { method: 'DELETE' });
+        if (res.ok) {
+          alertsData = [];
+          renderAlerts();
+        }
+      } catch (err) {
+        console.error('Failed to clear alerts:', err);
+      }
     }
 
     // Service Details Modal
