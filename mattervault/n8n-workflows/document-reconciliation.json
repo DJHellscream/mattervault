@@ -1,0 +1,56 @@
+{
+  "name": "Document Reconciliation (Sync)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "minutes", "minutesInterval": 15 }]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Every 15 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT sync.start_reconciliation('incremental') as run_id, sync.get_last_high_water_mark() as last_hwm",
+        "options": {}
+      },
+      "id": "db-start-run",
+      "name": "Start Reconciliation Run",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [450, 300],
+      "credentials": {
+        "postgres": { "id": "chatui-db", "name": "ChatUI Database" }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const result = $input.first().json;\nconst runId = result.run_id;\nconst lastHwm = result.last_hwm;\n\n// Calculate cutoff: use high water mark or fallback to 2 hours ago\nconst fallbackHours = 2;\nlet cutoff;\nif (lastHwm) {\n  cutoff = lastHwm;\n} else {\n  const d = new Date();\n  d.setHours(d.getHours() - fallbackHours);\n  cutoff = d.toISOString();\n}\n\nconsole.log('Run ID:', runId);\nconsole.log('Last HWM:', lastHwm);\nconsole.log('Using cutoff:', cutoff);\n\nreturn [{ json: { run_id: runId, cutoff: cutoff, start_time: new Date().toISOString() } }];"
+      },
+      "id": "code-prepare",
+      "name": "Prepare Reconciliation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 300]
+    }
+  ],
+  "connections": {
+    "Every 15 Minutes": {
+      "main": [[{ "node": "Start Reconciliation Run", "type": "main", "index": 0 }]]
+    },
+    "Start Reconciliation Run": {
+      "main": [[{ "node": "Prepare Reconciliation", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "maxRunTime": 900
+  }
+}
