@@ -138,6 +138,65 @@
       "credentials": {
         "postgres": { "id": "chatui-db", "name": "ChatUI Database" }
       }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [{
+            "id": "has-missing",
+            "leftValue": "={{ $json.missing.length }}",
+            "rightValue": 0,
+            "operator": { "type": "number", "operation": "gt" }
+          }],
+          "combinator": "and"
+        }
+      },
+      "id": "if-has-missing",
+      "name": "Has Missing?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1250, 450]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nreturn data.missing.map(m => ({ json: { ...m, run_id: data.run_id } }));"
+      },
+      "id": "code-split-missing",
+      "name": "Split Missing",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1450, 450]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://matterlogic:5678/webhook/document-added-v2",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"doc_url\": \"http://paperless:8000/api/documents/{{ $json.document_id }}/\",\n  \"title\": {{ JSON.stringify($json.title || 'Untitled') }}\n}",
+        "options": { "timeout": 300000 }
+      },
+      "id": "http-trigger-ingest",
+      "name": "Trigger Ingestion",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1650, 450]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=INSERT INTO sync.reconciliation_log (run_id, operation, document_id, document_title, status) VALUES ({{ $json.run_id }}, 'ingest', '{{ $json.document_id }}', {{ $json.title ? \"'\" + $json.title.replace(/'/g, \"''\") + \"'\" : 'NULL' }}, 'success')",
+        "options": {}
+      },
+      "id": "db-log-ingest",
+      "name": "Log Ingest",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1850, 450],
+      "credentials": {
+        "postgres": { "id": "chatui-db", "name": "ChatUI Database" }
+      }
     }
   ],
   "connections": {
@@ -160,7 +219,10 @@
       "main": [[{ "node": "Compare Document Sets", "type": "main", "index": 0 }]]
     },
     "Compare Document Sets": {
-      "main": [[{ "node": "Has Orphans?", "type": "main", "index": 0 }]]
+      "main": [[
+        { "node": "Has Orphans?", "type": "main", "index": 0 },
+        { "node": "Has Missing?", "type": "main", "index": 0 }
+      ]]
     },
     "Has Orphans?": {
       "main": [
@@ -173,6 +235,18 @@
     },
     "Delete Orphan from Qdrant": {
       "main": [[{ "node": "Log Delete", "type": "main", "index": 0 }]]
+    },
+    "Has Missing?": {
+      "main": [
+        [{ "node": "Split Missing", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "Split Missing": {
+      "main": [[{ "node": "Trigger Ingestion", "type": "main", "index": 0 }]]
+    },
+    "Trigger Ingestion": {
+      "main": [[{ "node": "Log Ingest", "type": "main", "index": 0 }]]
     }
   },
   "settings": {
