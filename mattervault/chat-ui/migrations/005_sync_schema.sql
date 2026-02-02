@@ -12,25 +12,26 @@ CREATE TABLE IF NOT EXISTS sync.reconciliation_state (
     completed_at TIMESTAMPTZ,
     last_success_at TIMESTAMPTZ,
     high_water_mark TIMESTAMPTZ,     -- Last processed timestamp for incremental
-    documents_checked INT DEFAULT 0,
-    documents_deleted INT DEFAULT 0,
-    documents_ingested INT DEFAULT 0,
-    status VARCHAR(20) DEFAULT 'running',  -- 'running', 'success', 'failed'
+    documents_checked INT NOT NULL DEFAULT 0,
+    documents_deleted INT NOT NULL DEFAULT 0,
+    documents_ingested INT NOT NULL DEFAULT 0,
+    status VARCHAR(20) DEFAULT 'running' CHECK (status IN ('running', 'success', 'failed')),
     error_message TEXT
 );
 
 CREATE INDEX idx_reconciliation_state_type ON sync.reconciliation_state(sync_type);
 CREATE INDEX idx_reconciliation_state_started ON sync.reconciliation_state(started_at DESC);
+CREATE INDEX idx_reconciliation_state_status ON sync.reconciliation_state(status);
 
 -- Detailed log of each sync operation
 CREATE TABLE IF NOT EXISTS sync.reconciliation_log (
     id SERIAL PRIMARY KEY,
-    run_id INT REFERENCES sync.reconciliation_state(id),
-    operation VARCHAR(20) NOT NULL,  -- 'delete', 'ingest', 'skip', 'verify'
+    run_id INT NOT NULL REFERENCES sync.reconciliation_state(id) ON DELETE CASCADE,
+    operation VARCHAR(20) NOT NULL CHECK (operation IN ('delete', 'ingest', 'skip', 'verify')),
     document_id VARCHAR(50) NOT NULL,
     document_title TEXT,
     family_id VARCHAR(100),
-    status VARCHAR(20) NOT NULL,     -- 'success', 'failed', 'skipped'
+    status VARCHAR(20) NOT NULL CHECK (status IN ('success', 'failed', 'skipped')),
     error_message TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
