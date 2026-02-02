@@ -262,6 +262,62 @@ do_verify() {
 }
 
 # ==============================================================================
+# SYNC TESTS
+# ==============================================================================
+do_sync_tests() {
+    header "Document Sync Tests"
+
+    # Get auth token
+    TOKEN=$(curl -sf "$PAPERLESS_URL/api/token/" \
+        -H "Content-Type: application/json" \
+        -d "{\"username\":\"$PAPERLESS_USER\",\"password\":\"$PAPERLESS_PASS\"}" | jq -r '.token')
+
+    # Test 1: Idempotent re-ingestion (no duplicates)
+    info "Test: Idempotent re-ingestion"
+    BEFORE_COUNT=$(curl -sf "$QDRANT_URL/collections/mattervault_documents_v2" | jq -r '.result.points_count')
+
+    # Get first document ID
+    DOC_ID=$(curl -sf "$PAPERLESS_URL/api/documents/" -H "Authorization: Token $TOKEN" | jq -r '.results[0].id')
+
+    if [ -n "$DOC_ID" ] && [ "$DOC_ID" != "null" ]; then
+        # Trigger re-ingestion
+        curl -sf -X POST "$N8N_URL/webhook/document-added-v2" \
+            -H "Content-Type: application/json" \
+            -d "{\"doc_url\":\"http://paperless:8000/api/documents/$DOC_ID/\"}" >/dev/null
+
+        sleep 30  # Wait for ingestion
+
+        AFTER_COUNT=$(curl -sf "$QDRANT_URL/collections/mattervault_documents_v2" | jq -r '.result.points_count')
+
+        if [ "$BEFORE_COUNT" -eq "$AFTER_COUNT" ]; then
+            pass "Idempotent re-ingestion (count unchanged: $BEFORE_COUNT)"
+        else
+            fail "Idempotent re-ingestion (before: $BEFORE_COUNT, after: $AFTER_COUNT)"
+        fi
+    else
+        warn "No documents to test re-ingestion"
+    fi
+
+    # Test 2: Sync schema exists
+    info "Test: Sync schema exists"
+    SCHEMA_EXISTS=$(psql "$CHATUI_DB" -t -A -c "SELECT EXISTS(SELECT 1 FROM pg_namespace WHERE nspname = 'sync')" 2>/dev/null || echo "f")
+    if [ "$SCHEMA_EXISTS" = "t" ]; then
+        pass "Sync schema exists"
+    else
+        fail "Sync schema not found"
+    fi
+
+    # Test 3: Reconciliation tables exist
+    info "Test: Reconciliation tables exist"
+    TABLES_EXIST=$(psql "$CHATUI_DB" -t -A -c "SELECT COUNT(*) FROM pg_tables WHERE schemaname = 'sync'" 2>/dev/null || echo "0")
+    if [ "$TABLES_EXIST" -ge 2 ]; then
+        pass "Reconciliation tables exist ($TABLES_EXIST tables)"
+    else
+        fail "Reconciliation tables missing (found: $TABLES_EXIST)"
+    fi
+}
+
+# ==============================================================================
 # MAIN
 # ==============================================================================
 MODE="${1:-full}"
@@ -287,8 +343,11 @@ case "$MODE" in
         do_test
         do_verify
         ;;
+    sync)
+        do_sync_tests
+        ;;
     *)
-        echo "Usage: $0 [reset|test|full]"
+        echo "Usage: $0 [reset|test|full|sync]"
         exit 1
         ;;
 esac
