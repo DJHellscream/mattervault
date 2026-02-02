@@ -352,10 +352,19 @@ docker compose up -d
 
 ```bash
 # Full test suite (reset + ingest + chat tests)
-docker exec e2e-runner /e2e/test.sh
+docker exec e2e-runner /e2e/test.sh full
 
-# Quick test (skip reset)
-docker exec e2e-runner /e2e/test.sh quick
+# Quick test (use existing data)
+docker exec e2e-runner /e2e/test.sh test
+
+# Document sync tests
+docker exec e2e-runner /e2e/test.sh sync
+
+# Audit system tests
+docker exec e2e-runner /e2e/test.sh audit
+
+# Complete suite (full + sync + audit)
+docker exec e2e-runner /e2e/test.sh all
 ```
 
 ### Key URLs

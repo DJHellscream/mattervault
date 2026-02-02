@@ -1,10 +1,13 @@
 #!/bin/bash
 # ==============================================================================
 # Mattervault E2E Test - Runs INSIDE Docker network
-# Usage: docker exec e2e-runner /e2e/test.sh [reset|test|full]
+# Usage: docker exec e2e-runner /e2e/test.sh [reset|test|full|sync|audit|all]
 #   reset - Clear all data
 #   test  - Run tests only (use existing data)
 #   full  - Reset + ingest + test (default)
+#   sync  - Run document sync tests
+#   audit - Run audit system tests
+#   all   - Full test suite including sync + audit
 # ==============================================================================
 set -euo pipefail
 
@@ -318,6 +321,127 @@ do_sync_tests() {
 }
 
 # ==============================================================================
+# AUDIT TESTS
+# ==============================================================================
+do_audit_tests() {
+    header "Audit System Tests"
+
+    # Test 1: Audit schema exists
+    info "Test: Audit schema exists"
+    SCHEMA_EXISTS=$(psql "$CHATUI_DB" -t -A -c "SELECT EXISTS(SELECT 1 FROM pg_namespace WHERE nspname = 'audit')" 2>/dev/null || echo "f")
+    if [ "$SCHEMA_EXISTS" = "t" ]; then
+        pass "Audit schema exists"
+    else
+        fail "Audit schema not found"
+        return 1
+    fi
+
+    # Test 2: Audit partitions exist
+    info "Test: Audit partitions exist"
+    PARTITION_COUNT=$(psql "$CHATUI_DB" -t -A -c "SELECT COUNT(*) FROM pg_tables WHERE schemaname = 'audit' AND tablename LIKE 'chat_query_logs_%'" 2>/dev/null || echo "0")
+    if [ "$PARTITION_COUNT" -ge 1 ]; then
+        pass "Audit partitions exist ($PARTITION_COUNT partitions)"
+    else
+        fail "No audit partitions found"
+    fi
+
+    # Test 3: Audit logs contain data (from previous chat tests)
+    info "Test: Audit logs contain data"
+    AUDIT_COUNT=$(psql "$CHATUI_DB" -t -A -c "SELECT COUNT(*) FROM audit.chat_query_logs WHERE created_at > NOW() - INTERVAL '1 hour'" 2>/dev/null || echo "0")
+    if [ "$AUDIT_COUNT" -ge 1 ]; then
+        pass "Audit logs contain data ($AUDIT_COUNT recent entries)"
+    else
+        warn "No recent audit entries (run chat tests first)"
+    fi
+
+    # Test 4: Audit log fields are populated
+    info "Test: Audit log fields populated"
+    COMPLETE_LOGS=$(psql "$CHATUI_DB" -t -A -c "
+        SELECT COUNT(*) FROM audit.chat_query_logs
+        WHERE created_at > NOW() - INTERVAL '1 hour'
+        AND correlation_id IS NOT NULL
+        AND query_text IS NOT NULL
+        AND family_id IS NOT NULL
+    " 2>/dev/null || echo "0")
+    if [ "$COMPLETE_LOGS" -ge 1 ]; then
+        pass "Audit logs have required fields ($COMPLETE_LOGS complete entries)"
+    else
+        warn "No complete audit entries found"
+    fi
+
+    # Test 5: Get ChatUI admin token for API tests
+    info "Test: ChatUI admin authentication"
+
+    # First login to Paperless to validate credentials
+    PAPERLESS_TOKEN=$(curl -sf "$PAPERLESS_URL/api/token/" \
+        -H "Content-Type: application/json" \
+        -d "{\"username\":\"$PAPERLESS_USER\",\"password\":\"$PAPERLESS_PASS\"}" | jq -r '.token // empty')
+
+    if [ -z "$PAPERLESS_TOKEN" ]; then
+        fail "Could not authenticate with Paperless"
+        return 1
+    fi
+
+    # Login to ChatUI
+    CHATUI_URL="http://mattervault-chat:3000"
+    LOGIN_RESPONSE=$(curl -sf "$CHATUI_URL/api/auth/login" \
+        -H "Content-Type: application/json" \
+        -d "{\"username\":\"$PAPERLESS_USER\",\"password\":\"$PAPERLESS_PASS\"}" 2>&1 || echo '{"error":"failed"}')
+
+    CHATUI_TOKEN=$(echo "$LOGIN_RESPONSE" | jq -r '.token // empty')
+
+    if [ -n "$CHATUI_TOKEN" ] && [ "$CHATUI_TOKEN" != "null" ]; then
+        pass "ChatUI admin authentication"
+    else
+        warn "ChatUI login failed (may need to login via browser first)"
+        # Continue with other tests
+    fi
+
+    # Test 6: Audit recent API endpoint (if authenticated)
+    if [ -n "$CHATUI_TOKEN" ] && [ "$CHATUI_TOKEN" != "null" ]; then
+        info "Test: Audit recent API"
+        RECENT_RESPONSE=$(curl -sf "$CHATUI_URL/api/audit/recent?limit=5" \
+            -H "Authorization: Bearer $CHATUI_TOKEN" 2>&1 || echo '{"error":"failed"}')
+
+        if echo "$RECENT_RESPONSE" | jq -e '.logs' >/dev/null 2>&1; then
+            RECENT_COUNT=$(echo "$RECENT_RESPONSE" | jq -r '.logs | length')
+            pass "Audit recent API ($RECENT_COUNT entries)"
+        else
+            ERROR_MSG=$(echo "$RECENT_RESPONSE" | jq -r '.error // .message // "unknown"')
+            fail "Audit recent API failed: $ERROR_MSG"
+        fi
+
+        # Test 7: Audit summary API endpoint
+        info "Test: Audit summary API"
+        SUMMARY_RESPONSE=$(curl -sf "$CHATUI_URL/api/audit/summary?group_by=family" \
+            -H "Authorization: Bearer $CHATUI_TOKEN" 2>&1 || echo '{"error":"failed"}')
+
+        if echo "$SUMMARY_RESPONSE" | jq -e '.summary' >/dev/null 2>&1; then
+            pass "Audit summary API"
+        else
+            ERROR_MSG=$(echo "$SUMMARY_RESPONSE" | jq -r '.error // .message // "unknown"')
+            fail "Audit summary API failed: $ERROR_MSG"
+        fi
+    else
+        warn "Skipping API tests (no auth token)"
+    fi
+
+    # Test 8: Verify audit partition maintenance tables
+    info "Test: Future partitions prepared"
+    FUTURE_PARTITIONS=$(psql "$CHATUI_DB" -t -A -c "
+        SELECT COUNT(*) FROM pg_tables
+        WHERE schemaname = 'audit'
+        AND tablename LIKE 'chat_query_logs_%'
+        AND tablename > 'chat_query_logs_' || to_char(NOW(), 'YYYY_MM')
+    " 2>/dev/null || echo "0")
+    if [ "$FUTURE_PARTITIONS" -ge 1 ]; then
+        pass "Future partitions exist ($FUTURE_PARTITIONS)"
+    else
+        warn "No future partitions (run partition maintenance)"
+    fi
+}
+
+# ==============================================================================
 # MAIN
 # ==============================================================================
 MODE="${1:-full}"
@@ -346,8 +470,19 @@ case "$MODE" in
     sync)
         do_sync_tests
         ;;
+    audit)
+        do_audit_tests
+        ;;
+    all)
+        do_reset
+        do_ingest
+        do_test
+        do_verify
+        do_sync_tests
+        do_audit_tests
+        ;;
     *)
-        echo "Usage: $0 [reset|test|full|sync]"
+        echo "Usage: $0 [reset|test|full|sync|audit|all]"
         exit 1
         ;;
 esac

@@ -7,11 +7,12 @@
 - Paperless-ngx authentication integration
 - Health dashboard with metrics, sparklines, uptime badges, recent queries
 - SQL sanitization/escaping
-- E2E test infrastructure
+- E2E test infrastructure (full, sync, audit modes)
 - CLAUDE.md documentation update
 - Admin UI for audit logs (with role sync from Paperless)
 - Mobile Chat UI (responsive layout, touch gestures, icon-only header on small screens)
 - Document change/delete sync (Qdrant ↔ Paperless reconciliation)
+- Audit system E2E tests (schema, partitions, API endpoints)
 
 ---
 
