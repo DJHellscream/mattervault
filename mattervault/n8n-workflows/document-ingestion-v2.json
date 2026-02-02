@@ -39,6 +39,27 @@
       },
       {
         "parameters": {
+          "method": "POST",
+          "url": "http://qdrant:6333/collections/mattervault_documents_v2/points/delete",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={\n  \"filter\": {\n    \"must\": [\n      {\n        \"key\": \"document_id\",\n        \"match\": { \"value\": \"{{ $json.document_id }}\" }\n      }\n    ]\n  }\n}",
+          "options": {
+            "timeout": 30000
+          }
+        },
+        "id": "http-delete-existing",
+        "name": "Delete Existing Chunks",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          550,
+          300
+        ],
+        "continueOnFail": true
+      },
+      {
+        "parameters": {
           "method": "GET",
           "url": "=http://paperless:8000/api/documents/{{ $json.document_id }}/",
           "authentication": "genericCredentialType",
@@ -52,7 +73,7 @@
         "type": "n8n-nodes-base.httpRequest",
         "typeVersion": 4.2,
         "position": [
-          650,
+          750,
           300
         ],
         "credentials": {
@@ -80,7 +101,7 @@
         "type": "n8n-nodes-base.httpRequest",
         "typeVersion": 4.2,
         "position": [
-          850,
+          950,
           300
         ],
         "credentials": {
@@ -99,7 +120,7 @@
         "type": "n8n-nodes-base.code",
         "typeVersion": 2,
         "position": [
-          1050,
+          1150,
           300
         ]
       },
@@ -130,7 +151,7 @@
         "type": "n8n-nodes-base.if",
         "typeVersion": 2.2,
         "position": [
-          1250,
+          1350,
           300
         ]
       },
@@ -143,7 +164,7 @@
         "type": "n8n-nodes-base.code",
         "typeVersion": 2,
         "position": [
-          1450,
+          1550,
           500
         ]
       },
@@ -166,7 +187,7 @@
         "type": "n8n-nodes-base.httpRequest",
         "typeVersion": 4.2,
         "position": [
-          1450,
+          1550,
           300
         ],
         "credentials": {
@@ -205,7 +226,7 @@
         "type": "n8n-nodes-base.httpRequest",
         "typeVersion": 4.2,
         "position": [
-          1650,
+          1750,
           300
         ]
       },
@@ -218,7 +239,7 @@
         "type": "n8n-nodes-base.code",
         "typeVersion": 2,
         "position": [
-          1850,
+          1950,
           300
         ]
       },
@@ -249,7 +270,7 @@
         "type": "n8n-nodes-base.if",
         "typeVersion": 2.2,
         "position": [
-          2050,
+          2150,
           300
         ]
       },
@@ -263,7 +284,7 @@
         "type": "n8n-nodes-base.wait",
         "typeVersion": 1.1,
         "position": [
-          2250,
+          2350,
           400
         ],
         "webhookId": "poll-wait-v2"
@@ -286,7 +307,7 @@
         "type": "n8n-nodes-base.httpRequest",
         "typeVersion": 4.2,
         "position": [
-          2450,
+          2550,
           400
         ]
       },
@@ -299,7 +320,7 @@
         "type": "n8n-nodes-base.code",
         "typeVersion": 2,
         "position": [
-          2650,
+          2750,
           400
         ]
       },
@@ -330,7 +351,7 @@
         "type": "n8n-nodes-base.if",
         "typeVersion": 2.2,
         "position": [
-          2850,
+          2950,
           400
         ]
       },
@@ -347,7 +368,7 @@
         "type": "n8n-nodes-base.httpRequest",
         "typeVersion": 4.2,
         "position": [
-          3050,
+          3150,
           300
         ]
       },
@@ -360,7 +381,7 @@
         "type": "n8n-nodes-base.code",
         "typeVersion": 2,
         "position": [
-          3250,
+          3350,
           300
         ]
       },
@@ -380,7 +401,7 @@
         "type": "n8n-nodes-base.httpRequest",
         "typeVersion": 4.2,
         "position": [
-          3450,
+          3550,
           300
         ]
       },
@@ -394,7 +415,7 @@
         "type": "n8n-nodes-base.code",
         "typeVersion": 2,
         "position": [
-          3650,
+          3750,
           300
         ]
       },
@@ -414,7 +435,7 @@
         "type": "n8n-nodes-base.httpRequest",
         "typeVersion": 4.2,
         "position": [
-          3850,
+          3950,
           300
         ]
       },
@@ -427,7 +448,7 @@
         "type": "n8n-nodes-base.code",
         "typeVersion": 2,
         "position": [
-          3050,
+          3150,
           500
         ]
       },
@@ -440,7 +461,7 @@
         "type": "n8n-nodes-base.code",
         "typeVersion": 2,
         "position": [
-          2250,
+          2350,
           200
         ]
       }
@@ -458,6 +479,17 @@
         ]
       },
       "Parse Document URL": {
+        "main": [
+          [
+            {
+              "node": "Delete Existing Chunks",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Delete Existing Chunks": {
         "main": [
           [
             {
