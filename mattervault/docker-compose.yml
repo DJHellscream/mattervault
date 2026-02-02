@@ -190,10 +190,7 @@ services:
       N8N_RUNNERS_DISABLED: false
       N8N_PUBLIC_API_ENABLED: "true"
       # Note: Ollama model config is now in the workflow's Config node, not env vars
-      # Document Sync Configuration
-      SYNC_RECONCILIATION_INTERVAL_MINUTES: ${SYNC_RECONCILIATION_INTERVAL_MINUTES:-15}
-      SYNC_FULL_SCAN_CRON: ${SYNC_FULL_SCAN_CRON:-0 2 * * 0}
-      SYNC_FALLBACK_WINDOW_HOURS: ${SYNC_FALLBACK_WINDOW_HOURS:-2}
+      # Note: Sync schedule is configured directly in the n8n reconciliation workflow
     volumes:
       - n8n_data:/home/node/.n8n
       - D:\CCC\mattervault\intake:/files/intake:ro  # Triggers
@@ -260,7 +257,28 @@ services:
       - matternet
 
   # ----------------------------------------------------------------------------
-  # ZONE 5: E2E TEST RUNNER (optional - for testing)
+  # ZONE 5: HEALTH DASHBOARD
+  # ----------------------------------------------------------------------------
+  health-dashboard:
+    build: ./dashboard
+    container_name: mattervault-dashboard
+    ports:
+      - "3006:3000"
+    volumes:
+      - dashboard_data:/app/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    depends_on:
+      - paperless
+      - n8n
+      - qdrant
+      - redis
+    networks:
+      - matternet
+
+  # ----------------------------------------------------------------------------
+  # ZONE 6: E2E TEST RUNNER (optional - for testing)
   # Usage: docker compose up -d e2e && docker exec e2e-runner /e2e/test.sh
   # ----------------------------------------------------------------------------
   e2e:
@@ -295,3 +313,4 @@ volumes:
   n8n_data:
   qdrant_data:
   qdrant_snapshots:
+  dashboard_data:

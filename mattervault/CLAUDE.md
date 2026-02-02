@@ -216,12 +216,9 @@ MatterVault keeps Qdrant vectors synchronized with Paperless using a hybrid appr
 
 ### Configuration
 
-```bash
-# .env
-SYNC_RECONCILIATION_INTERVAL_MINUTES=15  # How often to check for deletes
-SYNC_FULL_SCAN_CRON=0 2 * * 0            # Weekly full scan schedule
-SYNC_FALLBACK_WINDOW_HOURS=2             # Fallback if no high-water mark
-```
+Sync schedules are configured directly in the n8n "Document Reconciliation (Sync)" workflow:
+- **Interval**: Edit the Schedule Trigger node (default: 15 minutes)
+- **Full Scan**: Edit the cron expression (default: Sunday 2 AM)
 
 ### Monitoring
 
@@ -252,6 +249,16 @@ SELECT * FROM sync.reconciliation_log WHERE created_at > NOW() - INTERVAL '1 day
 | Audit Partition Maintenance | `SPDqGNXbYC6J4aKX` | Monthly partition creation |
 | Audit Archive (7-Year Retention) | `GkM7qDYrqrAQeAyv` | Archive old data |
 | Document Reconciliation (Sync) | `qmC66Y7q2qYPOfN6` | Scheduled sync + delete detection |
+
+### Workflow Files
+
+| File | Workflow |
+|------|----------|
+| `document-ingestion-v2.json` | Document Ingestion Pipeline V2 |
+| `mattervault-chat-v5.json` | Mattervault Chat V5 |
+| `document-reconciliation.json` | Document Reconciliation (Sync) |
+| `audit-partition-maintenance.json` | Audit Partition Maintenance |
+| `audit-archive.json` | Audit Archive (7-Year Retention) |
 
 ### Updating Workflows
 
@@ -334,6 +341,21 @@ WebSocket /ws            # Real-time updates
 ```
 
 ## 12. Development
+
+### Fresh Installation
+
+```bash
+# 1. Start Docker services
+docker compose up -d
+
+# 2. Run initialization script (creates Qdrant collection, imports n8n workflows, creates Paperless webhooks)
+./scripts/init-mattervault.sh
+
+# 3. Create intake folders for your families
+mkdir -p ./intake/smith ./intake/jones
+
+# 4. Login to Paperless and configure consumer to watch intake folders
+```
 
 ### Starting Services
 
