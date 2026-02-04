@@ -56,6 +56,18 @@
 
 ### Features
 
+**Prompt Library (Quick Actions)** *(Priority: Medium)*
+- Problem: Junior associates ask inconsistent questions, get inconsistent results
+- Solution: Dropdown in Chat UI with pre-built "Quick Actions" that standardize queries
+- Example actions:
+  - "Summarize Key Terms" → Structured summary of document provisions
+  - "Find Risk Clauses" → Identify indemnification, liability, termination clauses
+  - "Draft Statutory Summary" → Extract statutory references with citations
+  - "Compare to Template" → Highlight deviations from standard language
+- Implementation: Chat UI dropdown + prompt templates stored in config
+- Benefit: Consistent output quality, training aid for new staff
+- Effort: 3-4 hours (Chat UI + prompt engineering)
+
 **Metadata Filtering** *(Priority: Medium)*
 - Problem: Can only filter by `family_id`, but lawyers want to filter by date range, document type, correspondent
 - Solution: Propagate Paperless metadata to Qdrant payloads, expose in Chat UI
@@ -67,6 +79,33 @@
 - Could restrict users to specific families based on Paperless tag permissions
 - More relevant as user base grows
 - Effort: High
+
+### Future Vision
+
+**Visual Intelligence** *(Priority: Future)*
+- Problem: Charts, graphs, and tables in PDFs are not searchable as text
+- Solution: Integrate Llama 3.2 Vision to analyze visual elements detected by Docling
+- Implementation:
+  1. Docling detects images/charts/tables in PDF
+  2. Pass visual elements to Llama 3.2 Vision
+  3. Generate descriptive text (e.g., "Bar chart showing revenue growth from $1M to $5M, 2020-2024")
+  4. Index descriptions in Qdrant alongside document text
+- Benefit: "What was the revenue trend?" becomes answerable even from charts
+- Effort: High (new model integration, pipeline changes)
+- Dependencies: Llama 3.2 Vision availability in Ollama
+
+**Cross-Family Analysis** *(Priority: Future)*
+- Query across multiple families with appropriate access controls
+- Use case: "Find all trusts with this charitable remainder provision"
+- Requires per-family access control to be implemented first
+
+**Citation Export** *(Priority: Future)*
+- Format citations for court filings (Bluebook, local court rules)
+- Export answers with properly formatted legal citations
+
+**Saved Query Templates** *(Priority: Future)*
+- Firm-wide library of reusable queries
+- Share effective prompts across the organization
 
 ### Operations
 
@@ -85,9 +124,12 @@
 | Ingestion status tags | Low | High | Do first |
 | Large PDF chunking | Medium | High | Do second |
 | Hallucination testing | Low | High | Do third |
+| Prompt Library | Medium | High | After core reliability |
 | Metadata filtering | Medium | Medium | Nice to have |
 | Per-family access | High | Medium | When needed |
 | Production hardening | Medium | High | Before go-live |
+| Visual Intelligence | High | Medium | Future |
+| Cross-family analysis | High | Medium | Future |
 
 ---
 
