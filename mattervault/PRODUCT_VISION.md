@@ -99,7 +99,6 @@ One `docker compose up` to start. Health dashboard to monitor. E2E tests to veri
 | Feature | Description |
 |---------|-------------|
 | **Visual Intelligence** | Llama 3.2 Vision integration to analyze charts, graphs, and tables detected by Docling — converting visual data to searchable text |
-| **Cross-Family Analysis** | Query across multiple families with appropriate access controls (e.g., "Find all trusts with this provision") |
 | **Citation Export** | Format citations for court filings (Bluebook, local rules) |
 | **Saved Query Templates** | Firm-wide library of reusable queries for common tasks |
 | **Per-Family Access Control** | Restrict users to specific families based on role/permissions |

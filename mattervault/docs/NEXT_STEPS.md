@@ -94,11 +94,6 @@
 - Effort: High (new model integration, pipeline changes)
 - Dependencies: Llama 3.2 Vision availability in Ollama
 
-**Cross-Family Analysis** *(Priority: Future)*
-- Query across multiple families with appropriate access controls
-- Use case: "Find all trusts with this charitable remainder provision"
-- Requires per-family access control to be implemented first
-
 **Citation Export** *(Priority: Future)*
 - Format citations for court filings (Bluebook, local court rules)
 - Export answers with properly formatted legal citations
@@ -129,7 +124,7 @@
 | Per-family access | High | Medium | When needed |
 | Production hardening | Medium | High | Before go-live |
 | Visual Intelligence | High | Medium | Future |
-| Cross-family analysis | High | Medium | Future |
+| Citation export | Medium | Medium | Future |
 
 ---
 
@@ -143,6 +138,15 @@
 ---
 
 ## Not Planned
+
+**Cross-Family Analysis** *(decided 2026-02-04)*
+- Query across multiple families/matters simultaneously
+- Not implementing: violates law firm ethical requirements
+- Reasons:
+  - Ethical walls: attorneys are often "walled off" from certain matters due to conflicts
+  - Client confidentiality: mixing results could inadvertently waive privilege
+  - Malpractice risk: accidental exposure to conflicting client information
+- Family isolation is a **feature**, not a limitation—it enforces required ethical boundaries
 
 **Query Caching** *(decided 2026-01-29)*
 - Redis cache for repeated queries to skip LLM
