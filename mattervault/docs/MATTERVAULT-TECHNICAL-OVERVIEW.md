@@ -79,7 +79,7 @@ Mattervault employs a 5-zone modular architecture:
 
 | Model | Dimensions | Purpose |
 |-------|------------|---------|
-| nomic-embed-text | 768-dim | Dense semantic embeddings |
+| bge-m3 | 1024-dim | Dense semantic embeddings |
 | qwen3:8b | - | Response generation, reranking |
 | Qwen3-Reranker | 0.6B params | Cross-encoder relevance scoring |
 
@@ -221,10 +221,10 @@ User Question + Family Selection
 
 | Operation | Endpoint |
 |-----------|----------|
-| Collection info | `GET /collections/mattervault_documents_v2` |
-| Search | `POST /collections/mattervault_documents_v2/points/query` |
-| Upsert | `PUT /collections/mattervault_documents_v2/points` |
-| Delete | `DELETE /collections/mattervault_documents_v2/points` |
+| Collection info | `GET /collections/mattervault_documents_v3` |
+| Search | `POST /collections/mattervault_documents_v3/points/query` |
+| Upsert | `PUT /collections/mattervault_documents_v3/points` |
+| Delete | `DELETE /collections/mattervault_documents_v3/points` |
 
 ---
 
@@ -366,7 +366,7 @@ services:
 
 ```bash
 OLLAMA_HOST=0.0.0.0  # Required for Docker access on Windows
-OLLAMA_MODELS=nomic-embed-text,qwen3:8b
+OLLAMA_MODELS=bge-m3,qwen3:8b
 ```
 
 ### Docling API
@@ -481,7 +481,7 @@ N8N_DB_PASS=<secure-password>
 ./scripts/health-check.sh
 
 # Qdrant collection info
-curl http://localhost:6333/collections/mattervault_documents_v2
+curl http://localhost:6333/collections/mattervault_documents_v3
 
 # n8n workflow status
 curl http://localhost:5678/healthz

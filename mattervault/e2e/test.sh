@@ -1050,6 +1050,7 @@ run_embedding_validation_tests() {
         pass "Qdrant collection mattervault_documents_v3 exists"
     else
         fail "Qdrant collection mattervault_documents_v3 not found"
+        return 1
     fi
 
     # Test 2: Vector dimensions = 1024

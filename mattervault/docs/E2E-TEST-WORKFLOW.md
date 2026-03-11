@@ -98,7 +98,7 @@ docker logs mattervault -f
 docker exec matterdb-chatui psql -U chatui -d chatui -c "SELECT * FROM users"
 
 # Check if vectors exist
-curl http://localhost:6333/collections/mattervault_documents_v2
+curl http://localhost:6333/collections/mattervault_documents_v3
 ```
 
 ## Files
