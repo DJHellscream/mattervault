@@ -7,7 +7,8 @@
 #   1. Waits for all services to be healthy
 #   2. Creates Qdrant V2 collection with hybrid search schema
 #   3. Imports n8n workflows
-#   4. Creates Paperless webhooks to n8n
+#   4. Creates ingestion status tags (processing, ai_ready, ingestion_error)
+#   5. Creates Paperless webhooks to n8n
 #
 # Prerequisites:
 #   - Docker services running (docker compose up -d)
@@ -192,9 +193,9 @@ ACTIVE_COUNT=$(docker exec "$N8N_CONTAINER" n8n list:workflow --active=true 2>/d
 pass "n8n ready — $ACTIVE_COUNT workflow(s) active"
 
 # ==============================================================================
-# STEP 4: Create Paperless Webhooks
+# STEP 4: Ingestion Status Tags
 # ==============================================================================
-header "Step 4: Paperless Webhooks"
+header "Step 4: Ingestion Status Tags"
 
 info "Authenticating with Paperless..."
 TOKEN=$(curl -sf "$PAPERLESS_URL/api/token/" \
@@ -203,10 +204,47 @@ TOKEN=$(curl -sf "$PAPERLESS_URL/api/token/" \
 
 if [ -z "$TOKEN" ]; then
     fail "Could not authenticate with Paperless"
-    warn "Create webhooks manually in Paperless admin"
+    warn "Create status tags and webhooks manually in Paperless admin"
 else
     pass "Authenticated with Paperless"
 
+    info "Creating ingestion status tags..."
+    for tag_name in "processing" "ai_ready" "ingestion_error"; do
+        EXISTING=$(curl -sf "$PAPERLESS_URL/api/tags/?name__iexact=$tag_name" \
+            -H "Authorization: Token $TOKEN" 2>/dev/null | grep -o '"count":[0-9]*' | cut -d: -f2)
+        if [ "${EXISTING:-0}" -gt 0 ]; then
+            pass "Tag '$tag_name' already exists"
+        else
+            COLOR="#808080"
+            [ "$tag_name" = "processing" ] && COLOR="#FFA500"
+            [ "$tag_name" = "ai_ready" ] && COLOR="#28A745"
+            [ "$tag_name" = "ingestion_error" ] && COLOR="#DC3545"
+            curl -sf -X POST "$PAPERLESS_URL/api/tags/" \
+                -H "Authorization: Token $TOKEN" \
+                -H "Content-Type: application/json" \
+                -d "{\"name\":\"$tag_name\",\"color\":\"$COLOR\",\"is_inbox_tag\":false}" >/dev/null 2>&1 \
+                && pass "Created tag '$tag_name'" || warn "Failed to create tag '$tag_name'"
+        fi
+    done
+fi
+
+# ==============================================================================
+# STEP 5: Create Paperless Webhooks
+# ==============================================================================
+header "Step 5: Paperless Webhooks"
+
+# Re-use existing TOKEN from Step 4, or re-authenticate if needed
+if [ -z "$TOKEN" ]; then
+    info "Re-authenticating with Paperless..."
+    TOKEN=$(curl -sf "$PAPERLESS_URL/api/token/" \
+        -H "Content-Type: application/json" \
+        -d "{\"username\":\"$PAPERLESS_USER\",\"password\":\"$PAPERLESS_PASS\"}" | grep -o '"token":"[^"]*"' | cut -d'"' -f4)
+fi
+
+if [ -z "$TOKEN" ]; then
+    fail "Could not authenticate with Paperless"
+    warn "Create webhooks manually in Paperless admin"
+else
     # Check existing workflows
     EXISTING=$(curl -sf "$PAPERLESS_URL/api/workflows/" -H "Authorization: Token $TOKEN" | grep -o '"count":[0-9]*' | cut -d: -f2)
 

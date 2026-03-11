@@ -1,16 +1,17 @@
 #!/bin/bash
 # ==============================================================================
 # Mattervault E2E Test - Runs INSIDE Docker network
-# Usage: docker exec mattertest /e2e/test.sh [reset|test|full|sync|audit|hardening|prompt|hallucination|all]
-#   reset         - Clear all data
-#   test          - Run tests only (use existing data) + prompt quality + hallucination
-#   full          - Reset + ingest + test (default)
-#   sync          - Run document sync tests
-#   audit         - Run audit system tests
-#   hardening     - Family isolation hardening tests (tenant index, pre-consume, reconciliation, dashboard)
-#   prompt        - Prompt quality tests (off-topic rejection, citation format)
-#   hallucination - JSON-driven adversarial/factual/citation tests (grounding, factual accuracy, citations)
-#   all           - Full test suite including sync + audit + hardening + prompt + hallucination
+# Usage: docker exec mattertest /e2e/test.sh [reset|test|full|sync|audit|hardening|prompt|hallucination|ingestion-status|all]
+#   reset            - Clear all data
+#   test             - Run tests only (use existing data) + prompt quality + hallucination
+#   full             - Reset + ingest + test (default)
+#   sync             - Run document sync tests
+#   audit            - Run audit system tests
+#   hardening        - Family isolation hardening tests (tenant index, pre-consume, reconciliation, dashboard)
+#   prompt           - Prompt quality tests (off-topic rejection, citation format)
+#   hallucination    - JSON-driven adversarial/factual/citation tests (grounding, factual accuracy, citations)
+#   ingestion-status - Ingestion status tag tests (processing, ai_ready, ingestion_error)
+#   all              - Full test suite including sync + audit + hardening + prompt + hallucination + ingestion-status
 # ==============================================================================
 set -euo pipefail
 
@@ -881,6 +882,80 @@ run_hallucination_tests() {
 }
 
 # ==============================================================================
+# INGESTION STATUS TESTS
+# ==============================================================================
+do_ingestion_status_tests() {
+    header "Ingestion Status Tests"
+
+    # Get auth token
+    TOKEN=$(curl -sf "$PAPERLESS_URL/api/token/" \
+        -H "Content-Type: application/json" \
+        -d "{\"username\":\"$PAPERLESS_USER\",\"password\":\"$PAPERLESS_PASS\"}" | jq -r '.token // empty')
+
+    if [ -z "$TOKEN" ]; then
+        fail "Could not authenticate with Paperless"
+        return 1
+    fi
+
+    # Test 1: Status tags exist in Paperless
+    for tag_name in "processing" "ai_ready" "ingestion_error"; do
+        TAG_CHECK=$(curl -sf "$PAPERLESS_URL/api/tags/?name__iexact=$tag_name" \
+            -H "Authorization: Token $TOKEN" 2>/dev/null)
+        COUNT=$(echo "$TAG_CHECK" | jq '.count // 0')
+        if [ "$COUNT" -gt 0 ]; then
+            pass "Paperless tag '$tag_name' exists"
+        else
+            fail "Paperless tag '$tag_name' missing (run init-mattervault.sh)"
+        fi
+    done
+
+    # Test 2: Check that ingested documents have ai_ready tag (not processing)
+    DOC_COUNT=$(curl -sf "$PAPERLESS_URL/api/documents/" \
+        -H "Authorization: Token $TOKEN" | jq '.count // 0')
+
+    if [ "$DOC_COUNT" -gt 0 ]; then
+        # Get first document's tags
+        FIRST_DOC=$(curl -sf "$PAPERLESS_URL/api/documents/?page_size=1" \
+            -H "Authorization: Token $TOKEN")
+        DOC_ID=$(echo "$FIRST_DOC" | jq -r '.results[0].id')
+        DOC_TAGS=$(echo "$FIRST_DOC" | jq -r '.results[0].tags[]' 2>/dev/null)
+
+        # Get ai_ready tag ID
+        AI_READY_ID=$(curl -sf "$PAPERLESS_URL/api/tags/?name__iexact=ai_ready" \
+            -H "Authorization: Token $TOKEN" | jq -r '.results[0].id // empty')
+        PROCESSING_ID=$(curl -sf "$PAPERLESS_URL/api/tags/?name__iexact=processing" \
+            -H "Authorization: Token $TOKEN" | jq -r '.results[0].id // empty')
+
+        if [ -n "$AI_READY_ID" ] && echo "$DOC_TAGS" | grep -q "^${AI_READY_ID}$"; then
+            pass "Document $DOC_ID has 'ai_ready' tag"
+        else
+            warn "Document $DOC_ID missing 'ai_ready' tag (may need re-ingestion after workflow update)"
+        fi
+
+        if [ -n "$PROCESSING_ID" ] && echo "$DOC_TAGS" | grep -q "^${PROCESSING_ID}$"; then
+            fail "Document $DOC_ID still has 'processing' tag (stuck?)"
+        else
+            pass "Document $DOC_ID does not have stale 'processing' tag"
+        fi
+    else
+        warn "No documents in Paperless — skipping tag verification"
+    fi
+
+    # Test 3: Verify ingestion workflow JSON has tag management nodes
+    info "Test: Ingestion workflow has tag management nodes"
+    WF_FILE="/e2e/../n8n-workflows/document-ingestion-v2.json"
+    if [ -f "$WF_FILE" ]; then
+        if grep -q "Tag: Processing" "$WF_FILE" && grep -q "Tag: AI Ready" "$WF_FILE"; then
+            pass "Ingestion workflow has tag management nodes"
+        else
+            fail "Ingestion workflow missing tag management nodes"
+        fi
+    else
+        warn "Workflow file not accessible from test container"
+    fi
+}
+
+# ==============================================================================
 # MAIN
 # ==============================================================================
 MODE="${1:-full}"
@@ -925,6 +1000,9 @@ case "$MODE" in
     hallucination)
         run_hallucination_tests
         ;;
+    ingestion-status)
+        do_ingestion_status_tests
+        ;;
     all)
         do_reset
         do_ingest
@@ -935,9 +1013,10 @@ case "$MODE" in
         do_sync_tests
         do_audit_tests
         do_hardening_tests
+        do_ingestion_status_tests
         ;;
     *)
-        echo "Usage: $0 [reset|test|full|sync|audit|hardening|prompt|hallucination|all]"
+        echo "Usage: $0 [reset|test|full|sync|audit|hardening|prompt|hallucination|ingestion-status|all]"
         exit 1
         ;;
 esac
