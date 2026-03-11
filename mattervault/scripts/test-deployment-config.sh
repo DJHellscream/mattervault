@@ -203,6 +203,28 @@ else
     fail "CLAUDE.md missing .env.example setup instructions"
 fi
 
+# --- Docker healthcheck directives ---
+echo -e "\n  ${CYAN}[Docker healthcheck directives]${NC}"
+HEALTHCHECK_SERVICES="paperless n8n chat-ui health-dashboard qdrant"
+for service in $HEALTHCHECK_SERVICES; do
+    if grep -A 40 "^\s*${service}:" docker-compose.yml | grep -q "healthcheck:"; then
+        pass "$service has healthcheck directive"
+    else
+        fail "$service missing healthcheck directive"
+    fi
+done
+
+# --- Docker resource limits ---
+echo -e "\n  ${CYAN}[Docker resource limits]${NC}"
+RESOURCE_SERVICES="paperless n8n qdrant db-paperless db-n8n db-chatui redis chat-ui health-dashboard gotenberg tika"
+for service in $RESOURCE_SERVICES; do
+    if grep -A 40 "^\s*${service}:" docker-compose.yml | grep -q "deploy:"; then
+        pass "$service has resource limits"
+    else
+        fail "$service missing resource limits"
+    fi
+done
+
 # ============================================================================
 # PHASE 2: FRESH CLONE SIMULATION
 # ============================================================================

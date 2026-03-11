@@ -28,6 +28,10 @@ services:
     restart: always
     volumes:
       - redisdata:/data
+    deploy:
+      resources:
+        limits:
+          memory: 512M
     networks:
       - matternet
 
@@ -41,6 +45,10 @@ services:
       POSTGRES_PASSWORD: ${PAPERLESS_DB_PASS:-paperless_secure_pass}
     volumes:
       - pgdata_paperless:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          memory: 512M
     networks:
       - matternet
 
@@ -53,6 +61,10 @@ services:
       - "--chromium-disable-javascript=true"
       - "--chromium-allow-list=file:///tmp/.*"
       - "--api-timeout=300s"
+    deploy:
+      resources:
+        limits:
+          memory: 1G
     networks:
       - matternet
 
@@ -60,6 +72,10 @@ services:
     image: apache/tika:3.2.3.0
     container_name: matterparse
     restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 1G
     networks:
       - matternet
 
@@ -67,6 +83,18 @@ services:
     image: ghcr.io/paperless-ngx/paperless-ngx:2.20.5
     container_name: mattervault
     restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 512M
     depends_on:
       - redis
       - db-paperless
@@ -142,6 +170,18 @@ services:
     image: qdrant/qdrant:v1.16.2
     container_name: mattermemory
     restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:6333/healthz || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 256M
     ports:
       - "6333:6333"
       - "6334:6334"  # gRPC for advanced n8n agents
@@ -164,6 +204,10 @@ services:
       POSTGRES_PASSWORD: ${N8N_DB_PASS:-n8n_secure_pass}
     volumes:
       - pgdata_n8n:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          memory: 512M
     networks:
       - matternet
 
@@ -172,6 +216,18 @@ services:
     image: mattervault-n8n:latest
     container_name: matterlogic
     restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:5678/healthz || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 512M
     ports:
       - "5678:5678"
     environment:
@@ -229,6 +285,10 @@ services:
       POSTGRES_PASSWORD: ${CHATUI_DB_PASS:-chatui_secure_pass}
     volumes:
       - pgdata_chatui:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          memory: 512M
     networks:
       - matternet
 
@@ -236,6 +296,16 @@ services:
     build: ./chat-ui
     container_name: matterchat
     restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
     ports:
       - "3007:3000"
     environment:
@@ -294,6 +364,16 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/status || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
     depends_on:
       - paperless
       - n8n
