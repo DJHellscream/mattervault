@@ -782,6 +782,7 @@ case "$MODE" in
         do_ingest
         do_test
         do_verify
+        do_prompt_quality_tests
         ;;
     sync)
         do_sync_tests
