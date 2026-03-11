@@ -1,7 +1,7 @@
 #!/bin/bash
 # ==============================================================================
 # Mattervault E2E Test - Runs INSIDE Docker network
-# Usage: docker exec mattertest /e2e/test.sh [reset|test|full|sync|audit|hardening|prompt|hallucination|ingestion-status|all]
+# Usage: docker exec mattertest /e2e/test.sh [reset|test|full|sync|audit|hardening|prompt|hallucination|ingestion-status|large-pdf|all]
 #   reset            - Clear all data
 #   test             - Run tests only (use existing data) + prompt quality + hallucination
 #   full             - Reset + ingest + test (default)
@@ -11,7 +11,8 @@
 #   prompt           - Prompt quality tests (off-topic rejection, citation format)
 #   hallucination    - JSON-driven adversarial/factual/citation tests (grounding, factual accuracy, citations)
 #   ingestion-status - Ingestion status tag tests (processing, ai_ready, ingestion_error)
-#   all              - Full test suite including sync + audit + hardening + prompt + hallucination + ingestion-status
+#   large-pdf        - Large PDF handling tests (PyPDF2, split-pdf.py, Docling timeout)
+#   all              - Full test suite including sync + audit + hardening + prompt + hallucination + ingestion-status + large-pdf
 # ==============================================================================
 set -euo pipefail
 
@@ -956,6 +957,86 @@ do_ingestion_status_tests() {
 }
 
 # ==============================================================================
+# LARGE PDF HANDLING TESTS
+# ==============================================================================
+do_large_pdf_tests() {
+    header "Large PDF Handling Tests"
+
+    # Test 1: PyPDF2 is available in n8n container
+    if command -v docker >/dev/null 2>&1; then
+        info "Test: PyPDF2 available in n8n container"
+        if docker exec matterlogic python3 -c "from PyPDF2 import PdfReader; print('PyPDF2 available')" 2>/dev/null; then
+            pass "PyPDF2 available in n8n container"
+        else
+            fail "PyPDF2 missing from n8n container (rebuild: docker compose build n8n)"
+        fi
+
+        info "Test: split-pdf.py script is mounted"
+        if docker exec matterlogic test -f /files/scripts/split-pdf.py; then
+            pass "split-pdf.py is mounted in n8n container"
+        else
+            fail "split-pdf.py not found at /files/scripts/split-pdf.py"
+        fi
+
+        info "Test: split-pdf.py is functional"
+        SPLIT_TEST=$(docker exec matterlogic python3 /files/scripts/split-pdf.py --help 2>&1)
+        if echo "$SPLIT_TEST" | grep -q "max-pages"; then
+            pass "split-pdf.py is functional (--max-pages flag recognized)"
+        else
+            fail "split-pdf.py not working: $SPLIT_TEST"
+        fi
+    else
+        warn "docker CLI not available — skipping large PDF container tests"
+        warn "Run from host to test: docker exec matterlogic python3 -c 'from PyPDF2 import PdfReader'"
+    fi
+
+    # Test 2: Docling timeout is sufficient for large PDFs (>= 600s)
+    info "Test: Docling timeout >= 600s"
+    WF_FILE="/e2e/../n8n-workflows/document-ingestion-v2.json"
+    if [ -f "$WF_FILE" ]; then
+        TIMEOUT=$(python3 -c "
+import json
+wf = json.load(open('$WF_FILE'))
+wf = wf[0] if isinstance(wf, list) else wf
+for node in wf['nodes']:
+    if node['name'] == 'Start Docling Chunking':
+        print(node['parameters']['options'].get('timeout', 0))
+        break
+" 2>/dev/null || echo "0")
+        if [ "${TIMEOUT:-0}" -ge 600000 ]; then
+            pass "Docling timeout is ${TIMEOUT}ms (>= 600s)"
+        else
+            fail "Docling timeout too low: ${TIMEOUT}ms (need >= 600000)"
+        fi
+    else
+        warn "Workflow file not accessible"
+    fi
+
+    # Test 3: Polling max is sufficient (>= 120 polls = 10 min at 5s intervals)
+    info "Test: Docling polling max >= 120"
+    if [ -f "$WF_FILE" ]; then
+        POLL_MAX=$(python3 -c "
+import json, re
+wf = json.load(open('$WF_FILE'))
+wf = wf[0] if isinstance(wf, list) else wf
+for node in wf['nodes']:
+    if node['name'] == 'Check If Complete':
+        m = re.search(r'pollCount >= (\d+)', node['parameters']['jsCode'])
+        if m:
+            print(m.group(1))
+        break
+" 2>/dev/null || echo "0")
+        if [ "${POLL_MAX:-0}" -ge 120 ]; then
+            pass "Docling polling max is ${POLL_MAX} (>= 120)"
+        else
+            fail "Docling polling max too low: ${POLL_MAX} (need >= 120)"
+        fi
+    else
+        warn "Workflow file not accessible"
+    fi
+}
+
+# ==============================================================================
 # MAIN
 # ==============================================================================
 MODE="${1:-full}"
@@ -1003,6 +1084,9 @@ case "$MODE" in
     ingestion-status)
         do_ingestion_status_tests
         ;;
+    large-pdf)
+        do_large_pdf_tests
+        ;;
     all)
         do_reset
         do_ingest
@@ -1014,9 +1098,10 @@ case "$MODE" in
         do_audit_tests
         do_hardening_tests
         do_ingestion_status_tests
+        do_large_pdf_tests
         ;;
     *)
-        echo "Usage: $0 [reset|test|full|sync|audit|hardening|prompt|hallucination|ingestion-status|all]"
+        echo "Usage: $0 [reset|test|full|sync|audit|hardening|prompt|hallucination|ingestion-status|large-pdf|all]"
         exit 1
         ;;
 esac

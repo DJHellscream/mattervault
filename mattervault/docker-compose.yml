@@ -264,6 +264,7 @@ services:
       - ${MATTERVAULT_DATA_DIR:-.}/intake:/files/intake:ro  # Triggers
       - ${MATTERVAULT_DATA_DIR:-.}/paperless/consume:/files/paperless-consume  # Push files if needed
       - ./audit-archives:/files/audit-archives  # Audit log archives (7-year retention)
+      - ${MATTERVAULT_DATA_DIR:-.}/scripts:/files/scripts:ro  # Utility scripts (split-pdf.py, etc.)
     depends_on:
       - db-n8n
       - qdrant

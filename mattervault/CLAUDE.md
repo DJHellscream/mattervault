@@ -509,7 +509,7 @@ docker exec mattertest /e2e/test.sh all
 
 ## 15. Known Issues
 
-- Docling may timeout on PDFs >50 pages
+- Docling timeout set to 10 minutes (600s) for large PDFs; `scripts/split-pdf.py` available for manual splitting of 200+ page documents
 - Paperless webhooks require restart after n8n URL change
 - Ollama must run with `OLLAMA_HOST=0.0.0.0` on Windows
 

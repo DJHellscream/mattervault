@@ -9,4 +9,9 @@ RUN mkdir -p /home/node/.n8n/nodes && \
     npm init -y && \
     npm install n8n-nodes-reranker-ollama && \
     chown -R node:node /home/node/.n8n
+
+# Install PyPDF2 for large PDF splitting (>50 pages)
+RUN apk add --no-cache py3-pip && \
+    pip3 install --break-system-packages PyPDF2
+
 USER node
