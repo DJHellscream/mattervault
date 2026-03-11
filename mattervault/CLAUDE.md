@@ -51,7 +51,7 @@ Mattervault is a **private, air-gapped Document Intelligence System** built for 
 ### Document Ingestion Pipeline
 
 ```
-PDF dropped in ./intake/<family>/
+PDF/Audio dropped in ./intake/<family>/
         │
         ▼
 ┌───────────────┐
@@ -73,6 +73,8 @@ PDF dropped in ./intake/<family>/
            │  → Markdown   │                 │  bge-m3       │                 │  dense + BM25 │
            └───────────────┘                 └───────────────┘                 └───────────────┘
 ```
+
+**Audio Support**: Voice memos and audio recordings (WAV, MP3, M4A) are transcribed via Docling's Whisper ASR integration before embedding. Requires Docling to be started with ASR support: `docling-serve --host 0.0.0.0 --port 5001 --no-ui --asr`
 
 ### Chat Query Flow (V5)
 
@@ -434,7 +436,7 @@ cp .env.example .env
 # 2. Start native services (host machine)
 # Windows:  $env:OLLAMA_HOST="0.0.0.0"; ollama serve
 # Mac/Linux: OLLAMA_HOST=0.0.0.0 ollama serve
-# Docling:  docling-serve --host 0.0.0.0 --port 5001 --no-ui
+# Docling:  docling-serve --host 0.0.0.0 --port 5001 --no-ui --asr
 
 # 3. Pull AI models
 ollama pull qwen3:8b

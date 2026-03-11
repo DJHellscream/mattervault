@@ -1,7 +1,7 @@
 #!/bin/bash
 # ==============================================================================
 # Mattervault E2E Test - Runs INSIDE Docker network
-# Usage: docker exec mattertest /e2e/test.sh [reset|test|full|sync|audit|hardening|prompt|hallucination|ingestion-status|large-pdf|embedding|all]
+# Usage: docker exec mattertest /e2e/test.sh [reset|test|full|sync|audit|hardening|prompt|hallucination|ingestion-status|large-pdf|embedding|audio|all]
 #   reset            - Clear all data
 #   test             - Run tests only (use existing data) + prompt quality + hallucination
 #   full             - Reset + ingest + test (default)
@@ -13,7 +13,8 @@
 #   ingestion-status - Ingestion status tag tests (processing, ai_ready, ingestion_error)
 #   large-pdf        - Large PDF handling tests (PyPDF2, split-pdf.py, Docling timeout)
 #   embedding        - Embedding validation tests (collection v3, 1024d, bge-m3 model)
-#   all              - Full test suite including sync + audit + hardening + prompt + hallucination + ingestion-status + large-pdf + embedding
+#   audio            - Audio ingestion tests (Docling ASR, workflow config, Whisper support)
+#   all              - Full test suite including sync + audit + hardening + prompt + hallucination + ingestion-status + large-pdf + embedding + audio
 # ==============================================================================
 set -euo pipefail
 
@@ -1074,6 +1075,94 @@ run_embedding_validation_tests() {
 }
 
 # ==============================================================================
+# AUDIO INGESTION TESTS
+# ==============================================================================
+run_audio_ingestion_tests() {
+    header "Audio Ingestion Tests"
+
+    # Test 1: Docling API health check
+    info "Test: Docling API is responding"
+    DOCLING_HOST="${DOCLING_URL:-http://host.docker.internal:5001}"
+    DOCLING_HEALTH=$(curl -sf "$DOCLING_HOST/health" 2>/dev/null)
+    if [ $? -eq 0 ]; then
+        pass "Docling API responding at $DOCLING_HOST"
+    else
+        fail "Docling API not responding at $DOCLING_HOST"
+        return 1
+    fi
+
+    # Test 2: Ingestion workflow includes audio in convert_from_formats
+    info "Test: Ingestion workflow includes audio in convert_from_formats"
+    WORKFLOW_FILE="/e2e/../n8n-workflows/document-ingestion-v2.json"
+    if [ ! -f "$WORKFLOW_FILE" ]; then
+        # Try alternate path inside test container
+        WORKFLOW_FILE="/workspace/n8n-workflows/document-ingestion-v2.json"
+    fi
+    if [ -f "$WORKFLOW_FILE" ]; then
+        # Extract options value from Start Docling Chunking node
+        HAS_AUDIO=$(python3 -c "
+import json, sys
+with open('$WORKFLOW_FILE', 'r') as f:
+    wf = json.load(f)
+if isinstance(wf, list):
+    wf = wf[0]
+for node in wf.get('nodes', []):
+    if node.get('name') == 'Start Docling Chunking':
+        for param in node['parameters']['bodyParameters']['parameters']:
+            if param['name'] == 'options':
+                opts = json.loads(param['value'])
+                formats = opts.get('convert_from_formats', [])
+                if 'audio' in formats:
+                    print('yes')
+                    sys.exit(0)
+                else:
+                    print('no: formats=' + str(formats))
+                    sys.exit(0)
+print('no: node not found')
+" 2>/dev/null)
+        if [ "$HAS_AUDIO" = "yes" ]; then
+            pass "Workflow includes audio in convert_from_formats"
+        else
+            fail "Workflow missing audio in convert_from_formats ($HAS_AUDIO)"
+        fi
+    else
+        fail "Ingestion workflow JSON not found"
+    fi
+
+    # Test 3: Start Docling Chunking node exists with proper structure
+    info "Test: Start Docling Chunking node structure"
+    if [ -f "$WORKFLOW_FILE" ]; then
+        NODE_CHECK=$(python3 -c "
+import json, sys
+with open('$WORKFLOW_FILE', 'r') as f:
+    wf = json.load(f)
+if isinstance(wf, list):
+    wf = wf[0]
+for node in wf.get('nodes', []):
+    if node.get('name') == 'Start Docling Chunking':
+        params = node.get('parameters', {})
+        body = params.get('bodyParameters', {}).get('parameters', [])
+        has_file = any(p.get('name') == 'files' for p in body)
+        has_opts = any(p.get('name') == 'options' for p in body)
+        url = params.get('url', '')
+        if has_file and has_opts and 'chunk' in url:
+            print('yes')
+        else:
+            print('no: file=' + str(has_file) + ' opts=' + str(has_opts) + ' url=' + url)
+        sys.exit(0)
+print('no: node not found')
+" 2>/dev/null)
+        if [ "$NODE_CHECK" = "yes" ]; then
+            pass "Start Docling Chunking node has correct structure (files + options + chunk URL)"
+        else
+            fail "Start Docling Chunking node structure invalid ($NODE_CHECK)"
+        fi
+    else
+        fail "Ingestion workflow JSON not found"
+    fi
+}
+
+# ==============================================================================
 # MAIN
 # ==============================================================================
 MODE="${1:-full}"
@@ -1129,6 +1218,9 @@ case "$MODE" in
     embedding)
         run_embedding_validation_tests
         ;;
+    audio)
+        run_audio_ingestion_tests
+        ;;
     all)
         do_reset
         do_ingest
@@ -1142,9 +1234,10 @@ case "$MODE" in
         do_ingestion_status_tests
         do_large_pdf_tests
         run_embedding_validation_tests
+        run_audio_ingestion_tests
         ;;
     *)
-        echo "Usage: $0 [reset|test|full|sync|audit|hardening|prompt|hallucination|ingestion-status|large-pdf|embedding|all]"
+        echo "Usage: $0 [reset|test|full|sync|audit|hardening|prompt|hallucination|ingestion-status|large-pdf|embedding|audio|all]"
         exit 1
         ;;
 esac
