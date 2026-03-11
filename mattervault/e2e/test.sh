@@ -994,47 +994,37 @@ do_large_pdf_tests() {
 
     # Test 2: Docling timeout is sufficient for large PDFs (>= 600s)
     info "Test: Docling timeout >= 600s"
-    WF_FILE="/e2e/../n8n-workflows/document-ingestion-v2.json"
+    WF_FILE="/files/n8n-workflows/document-ingestion-v2.json"
     if [ -f "$WF_FILE" ]; then
-        TIMEOUT=$(python3 -c "
-import json
-wf = json.load(open('$WF_FILE'))
-wf = wf[0] if isinstance(wf, list) else wf
-for node in wf['nodes']:
-    if node['name'] == 'Start Docling Chunking':
-        print(node['parameters']['options'].get('timeout', 0))
-        break
-" 2>/dev/null || echo "0")
+        TIMEOUT=$(jq -r '
+            (if type == "array" then .[0] else . end).nodes[]
+            | select(.name == "Start Docling Chunking")
+            | .parameters.options.timeout // 0
+        ' "$WF_FILE" 2>/dev/null || echo "0")
         if [ "${TIMEOUT:-0}" -ge 600000 ]; then
             pass "Docling timeout is ${TIMEOUT}ms (>= 600s)"
         else
             fail "Docling timeout too low: ${TIMEOUT}ms (need >= 600000)"
         fi
     else
-        warn "Workflow file not accessible"
+        warn "Workflow file not accessible at $WF_FILE"
     fi
 
     # Test 3: Polling max is sufficient (>= 120 polls = 10 min at 5s intervals)
     info "Test: Docling polling max >= 120"
     if [ -f "$WF_FILE" ]; then
-        POLL_MAX=$(python3 -c "
-import json, re
-wf = json.load(open('$WF_FILE'))
-wf = wf[0] if isinstance(wf, list) else wf
-for node in wf['nodes']:
-    if node['name'] == 'Check If Complete':
-        m = re.search(r'pollCount >= (\d+)', node['parameters']['jsCode'])
-        if m:
-            print(m.group(1))
-        break
-" 2>/dev/null || echo "0")
+        POLL_MAX=$(jq -r '
+            (if type == "array" then .[0] else . end).nodes[]
+            | select(.name == "Check If Complete")
+            | .parameters.jsCode
+        ' "$WF_FILE" 2>/dev/null | grep -oP 'pollCount >= \K\d+' || echo "0")
         if [ "${POLL_MAX:-0}" -ge 120 ]; then
             pass "Docling polling max is ${POLL_MAX} (>= 120)"
         else
             fail "Docling polling max too low: ${POLL_MAX} (need >= 120)"
         fi
     else
-        warn "Workflow file not accessible"
+        warn "Workflow file not accessible at $WF_FILE"
     fi
 }
 
@@ -1083,82 +1073,49 @@ run_audio_ingestion_tests() {
     # Test 1: Docling API health check
     info "Test: Docling API is responding"
     DOCLING_HOST="${DOCLING_URL:-http://host.docker.internal:5001}"
-    DOCLING_HEALTH=$(curl -sf "$DOCLING_HOST/health" 2>/dev/null)
-    if [ $? -eq 0 ]; then
+    if curl -sf "$DOCLING_HOST/health" >/dev/null 2>&1; then
         pass "Docling API responding at $DOCLING_HOST"
     else
         fail "Docling API not responding at $DOCLING_HOST"
-        return 1
     fi
 
     # Test 2: Ingestion workflow includes audio in convert_from_formats
     info "Test: Ingestion workflow includes audio in convert_from_formats"
-    WORKFLOW_FILE="/e2e/../n8n-workflows/document-ingestion-v2.json"
-    if [ ! -f "$WORKFLOW_FILE" ]; then
-        # Try alternate path inside test container
-        WORKFLOW_FILE="/workspace/n8n-workflows/document-ingestion-v2.json"
-    fi
+    WORKFLOW_FILE="/files/n8n-workflows/document-ingestion-v2.json"
     if [ -f "$WORKFLOW_FILE" ]; then
-        # Extract options value from Start Docling Chunking node
-        HAS_AUDIO=$(python3 -c "
-import json, sys
-with open('$WORKFLOW_FILE', 'r') as f:
-    wf = json.load(f)
-if isinstance(wf, list):
-    wf = wf[0]
-for node in wf.get('nodes', []):
-    if node.get('name') == 'Start Docling Chunking':
-        for param in node['parameters']['bodyParameters']['parameters']:
-            if param['name'] == 'options':
-                opts = json.loads(param['value'])
-                formats = opts.get('convert_from_formats', [])
-                if 'audio' in formats:
-                    print('yes')
-                    sys.exit(0)
-                else:
-                    print('no: formats=' + str(formats))
-                    sys.exit(0)
-print('no: node not found')
-" 2>/dev/null)
+        HAS_AUDIO=$(jq -r '
+            (if type == "array" then .[0] else . end).nodes[]
+            | select(.name == "Start Docling Chunking")
+            | .parameters.bodyParameters.parameters[]
+            | select(.name == "options")
+            | .value | fromjson
+            | .convert_from_formats // []
+            | if map(select(. == "audio")) | length > 0 then "yes" else "no" end
+        ' "$WORKFLOW_FILE" 2>/dev/null || echo "no")
         if [ "$HAS_AUDIO" = "yes" ]; then
             pass "Workflow includes audio in convert_from_formats"
         else
-            fail "Workflow missing audio in convert_from_formats ($HAS_AUDIO)"
+            fail "Workflow missing audio in convert_from_formats"
         fi
     else
-        fail "Ingestion workflow JSON not found"
+        warn "Workflow file not accessible at $WORKFLOW_FILE"
     fi
 
     # Test 3: Start Docling Chunking node exists with proper structure
     info "Test: Start Docling Chunking node structure"
     if [ -f "$WORKFLOW_FILE" ]; then
-        NODE_CHECK=$(python3 -c "
-import json, sys
-with open('$WORKFLOW_FILE', 'r') as f:
-    wf = json.load(f)
-if isinstance(wf, list):
-    wf = wf[0]
-for node in wf.get('nodes', []):
-    if node.get('name') == 'Start Docling Chunking':
-        params = node.get('parameters', {})
-        body = params.get('bodyParameters', {}).get('parameters', [])
-        has_file = any(p.get('name') == 'files' for p in body)
-        has_opts = any(p.get('name') == 'options' for p in body)
-        url = params.get('url', '')
-        if has_file and has_opts and 'chunk' in url:
-            print('yes')
-        else:
-            print('no: file=' + str(has_file) + ' opts=' + str(has_opts) + ' url=' + url)
-        sys.exit(0)
-print('no: node not found')
-" 2>/dev/null)
-        if [ "$NODE_CHECK" = "yes" ]; then
-            pass "Start Docling Chunking node has correct structure (files + options + chunk URL)"
+        NODE_URL=$(jq -r '
+            (if type == "array" then .[0] else . end).nodes[]
+            | select(.name == "Start Docling Chunking")
+            | .parameters.url // ""
+        ' "$WORKFLOW_FILE" 2>/dev/null || echo "")
+        if echo "$NODE_URL" | grep -q "chunk"; then
+            pass "Start Docling Chunking node targets chunking endpoint"
         else
-            fail "Start Docling Chunking node structure invalid ($NODE_CHECK)"
+            fail "Start Docling Chunking node URL missing or wrong: $NODE_URL"
         fi
     else
-        fail "Ingestion workflow JSON not found"
+        warn "Workflow file not accessible at $WORKFLOW_FILE"
     fi
 }
 

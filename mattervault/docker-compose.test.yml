@@ -14,6 +14,7 @@ services:
     volumes:
       - ${MATTERVAULT_DATA_DIR:-.}/intake:/files/intake
       - "${MATTERVAULT_DATA_DIR:-.}/demo data:/files/demo:ro"
+      - ${MATTERVAULT_DATA_DIR:-.}/n8n-workflows:/files/n8n-workflows:ro
     networks:
       - matternet
     extra_hosts:

@@ -488,7 +488,10 @@ docker exec mattertest /e2e/test.sh audit
 # Embedding validation tests
 docker exec mattertest /e2e/test.sh embedding
 
-# Complete suite (full + sync + audit + embedding + more)
+# Audio ingestion tests (requires Docling with --asr)
+docker exec mattertest /e2e/test.sh audio
+
+# Complete suite (full + sync + audit + embedding + audio + more)
 docker exec mattertest /e2e/test.sh all
 ```
 
