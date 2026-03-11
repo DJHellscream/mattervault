@@ -1,14 +1,15 @@
 #!/bin/bash
 # ==============================================================================
 # Mattervault E2E Test - Runs INSIDE Docker network
-# Usage: docker exec mattertest /e2e/test.sh [reset|test|full|sync|audit|hardening|all]
+# Usage: docker exec mattertest /e2e/test.sh [reset|test|full|sync|audit|hardening|prompt|all]
 #   reset     - Clear all data
-#   test      - Run tests only (use existing data)
+#   test      - Run tests only (use existing data) + prompt quality
 #   full      - Reset + ingest + test (default)
 #   sync      - Run document sync tests
 #   audit     - Run audit system tests
 #   hardening - Family isolation hardening tests (tenant index, pre-consume, reconciliation, dashboard)
-#   all       - Full test suite including sync + audit + hardening
+#   prompt    - Prompt quality tests (off-topic rejection, citation format)
+#   all       - Full test suite including sync + audit + hardening + prompt
 # ==============================================================================
 set -euo pipefail
 
@@ -706,6 +707,56 @@ do_hardening_tests() {
 }
 
 # ==============================================================================
+# PROMPT QUALITY TESTS
+# ==============================================================================
+do_prompt_quality_tests() {
+    header "Prompt Quality Tests"
+
+    # Get valid user_id
+    USER_ID=$(psql "$CHATUI_DB" -t -A -c "SELECT id FROM users WHERE paperless_username='admin' LIMIT 1" 2>/dev/null | tr -d '[:space:]')
+    if [ -z "$USER_ID" ]; then
+        fail "No admin user in ChatUI database"
+        info "Login via chat-ui first to create user"
+        return 1
+    fi
+
+    # Test 1: Off-topic question should be declined
+    echo ""
+    info "Test: off-topic question rejection"
+    RESPONSE=$(curl -s --max-time 120 "$N8N_URL/webhook/chat-api-v3" \
+        -H "Content-Type: application/json" \
+        -d "{\"question\":\"What is the capital of France?\",\"family_id\":\"morrison\",\"user_id\":\"$USER_ID\",\"conversation_id\":\"test-grounding-$(date +%s)\"}" 2>/dev/null || echo '{"error":"timeout"}')
+
+    ANSWER=$(echo "$RESPONSE" | jq -r '.output // .message // "no output"' 2>/dev/null | tr '[:upper:]' '[:lower:]')
+    if echo "$ANSWER" | grep -qiE "don.t find|no information|cannot determine|only answer questions about documents|not in.*documents|unrelated|can only answer"; then
+        pass "Model correctly declined off-topic question"
+    elif echo "$ANSWER" | grep -qiE "error in workflow|timeout"; then
+        warn "Off-topic test skipped (workflow error — retry with: test.sh prompt)"
+    else
+        fail "Model answered off-topic question: $(echo "$ANSWER" | head -c 200)"
+    fi
+
+    sleep 2
+
+    # Test 2: On-topic question should include citations
+    info "Test: citation format in on-topic response"
+    RESPONSE2=$(curl -s --max-time 120 "$N8N_URL/webhook/chat-api-v3" \
+        -H "Content-Type: application/json" \
+        -d "{\"question\":\"What documents do we have for this family?\",\"family_id\":\"morrison\",\"user_id\":\"$USER_ID\",\"conversation_id\":\"test-citations-$(date +%s)\"}" 2>/dev/null || echo '{"error":"timeout"}')
+
+    ANSWER2=$(echo "$RESPONSE2" | jq -r '.output // .message // "no output"' 2>/dev/null)
+    if echo "$ANSWER2" | grep -qiE "\(Source:.*Page"; then
+        pass "Model uses correct citation format (Source: [Title], Page [N])"
+    elif echo "$ANSWER2" | grep -qiE "error in workflow|timeout"; then
+        warn "Citation test skipped (workflow error — retry with: test.sh prompt)"
+    elif echo "$ANSWER2" | grep -qiE "source|document|page"; then
+        warn "Model references documents but may not use exact citation format"
+    else
+        fail "Model response lacks citations: $(echo "$ANSWER2" | head -c 200)"
+    fi
+}
+
+# ==============================================================================
 # MAIN
 # ==============================================================================
 MODE="${1:-full}"
@@ -724,6 +775,7 @@ case "$MODE" in
     test)
         do_test
         do_verify
+        do_prompt_quality_tests
         ;;
     full)
         do_reset
@@ -740,17 +792,21 @@ case "$MODE" in
     hardening)
         do_hardening_tests
         ;;
+    prompt)
+        do_prompt_quality_tests
+        ;;
     all)
         do_reset
         do_ingest
         do_test
         do_verify
+        do_prompt_quality_tests
         do_sync_tests
         do_audit_tests
         do_hardening_tests
         ;;
     *)
-        echo "Usage: $0 [reset|test|full|sync|audit|hardening|all]"
+        echo "Usage: $0 [reset|test|full|sync|audit|hardening|prompt|all]"
         exit 1
         ;;
 esac
