@@ -61,7 +61,7 @@ PDF/Audio dropped in ./intake/<family>/
                                                          ▼
                                               ┌──────────────────┐
                                               │  n8n Ingestion   │
-                                              │  Workflow V2     │
+                                              │  Workflow        │
                                               └────────┬─────────┘
                                                        │
                     ┌──────────────────────────────────┼──────────────────────────────────┐
@@ -76,14 +76,14 @@ PDF/Audio dropped in ./intake/<family>/
 
 **Audio Support**: Voice memos and audio recordings (WAV, MP3, M4A) are transcribed via Docling's Whisper ASR integration before embedding. Requires Docling to be started with ASR support: `docling-serve --host 0.0.0.0 --port 5001 --no-ui --asr`
 
-### Chat Query Flow (V5)
+### Chat Query Flow
 
 ```
 User Question (Chat-UI)
         │
         ▼
 ┌───────────────────────────────────────────────────────────────────────┐
-│                    n8n Chat Workflow V5                                │
+│                    n8n Chat Workflow                                   │
 ├───────────────────────────────────────────────────────────────────────┤
 │  1. Get/Create Conversation (Postgres)                                 │
 │  2. Save User Message (Postgres)                                       │
@@ -269,8 +269,8 @@ SELECT * FROM sync.reconciliation_log WHERE created_at > NOW() - INTERVAL '1 day
 
 | Workflow | ID | Purpose |
 |----------|-----|---------|
-| Document Ingestion Pipeline V2 (Hybrid) | `ZIhqLsxBzrUam8bi` | Ingest PDFs → Qdrant |
-| Mattervault Chat V5 (With Persistence) | `wHoLnYdlFJoaHfDZ` | Chat API with history + audit |
+| Document Ingestion Pipeline | `ZIhqLsxBzrUam8bi` | Ingest PDFs → Qdrant |
+| Mattervault Chat | `wHoLnYdlFJoaHfDZ` | Chat API with history + audit |
 | Audit Partition Maintenance | `SPDqGNXbYC6J4aKX` | Monthly partition creation |
 | Audit Archive (7-Year Retention) | `GkM7qDYrqrAQeAyv` | Archive old data |
 | Document Reconciliation (Sync) | `qmC66Y7q2qYPOfN6` | Scheduled sync + delete detection |
@@ -279,8 +279,8 @@ SELECT * FROM sync.reconciliation_log WHERE created_at > NOW() - INTERVAL '1 day
 
 | File | Workflow |
 |------|----------|
-| `document-ingestion-v2.json` | Document Ingestion Pipeline V2 |
-| `mattervault-chat-v5.json` | Mattervault Chat V5 |
+| `document-ingestion.json` | Document Ingestion Pipeline |
+| `mattervault-chat.json` | Mattervault Chat |
 | `document-reconciliation.json` | Document Reconciliation (Sync) |
 | `audit-partition-maintenance.json` | Audit Partition Maintenance |
 | `audit-archive.json` | Audit Archive (7-Year Retention) |

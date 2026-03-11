@@ -36,7 +36,7 @@ const config = {
     url: process.env.QDRANT_URL || 'http://mattermemory:6333'
   },
   n8n: {
-    webhookUrl: process.env.N8N_WEBHOOK_URL || 'http://matterlogic:5678/webhook/chat-api-v3'
+    webhookUrl: process.env.N8N_WEBHOOK_URL || 'http://matterlogic:5678/webhook/chat-api'
   }
 };
 

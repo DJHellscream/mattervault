@@ -23,7 +23,7 @@ Configure Paperless-ngx to notify MatterVault when documents are updated.
 5. Add Action:
    - Click **Add Action**
    - **Type**: Webhook
-   - **URL**: `http://matterlogic:5678/webhook/document-added-v2`
+   - **URL**: `http://matterlogic:5678/webhook/document-added`
    - **Body**:
      ```json
      {"doc_url": "http://mattervault:8000/api/documents/{doc_pk}/", "title": "{title}"}
@@ -41,6 +41,6 @@ After saving, update a document in Paperless:
 
 ### Notes
 
-- The workflow reuses the existing `document-added-v2` webhook since the ingestion pipeline is now idempotent (delete-before-ingest)
+- The workflow reuses the existing `document-added` webhook since the ingestion pipeline is now idempotent (delete-before-ingest)
 - Documents are re-indexed automatically when updated
 - No separate "Document Updated" webhook endpoint is needed

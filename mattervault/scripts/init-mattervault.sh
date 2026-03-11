@@ -136,8 +136,8 @@ header "Step 3: n8n Workflows"
 
 # Workflow files and their known IDs (for activation after import)
 WORKFLOWS=(
-    "document-ingestion-v2.json"
-    "mattervault-chat-v5.json"
+    "document-ingestion.json"
+    "mattervault-chat.json"
     "document-reconciliation.json"
     "audit-partition-maintenance.json"
     "audit-archive.json"
@@ -270,7 +270,7 @@ else
                 "actions": [{
                     "type": 4,
                     "webhook": {
-                        "url": "http://matterlogic:5678/webhook/document-added-v2",
+                        "url": "http://matterlogic:5678/webhook/document-added",
                         "use_params": false,
                         "as_json": true,
                         "body": "{\"doc_url\": \"{{doc_url}}\", \"title\": \"{{doc_title}}\"}"
@@ -295,7 +295,7 @@ else
                 "actions": [{
                     "type": 4,
                     "webhook": {
-                        "url": "http://matterlogic:5678/webhook/document-added-v2",
+                        "url": "http://matterlogic:5678/webhook/document-added",
                         "use_params": false,
                         "as_json": true,
                         "body": "{\"doc_url\": \"{{doc_url}}\", \"title\": \"{{doc_title}}\"}"

@@ -3,7 +3,7 @@
 *Updated 2026-03-11*
 
 ## Recently Completed
-- V5 Chat workflow with conversation persistence + audit logging
+- Chat workflow with conversation persistence + audit logging
 - Paperless-ngx authentication integration
 - Health dashboard with metrics, sparklines, uptime badges, recent queries
 - SQL sanitization/escaping
@@ -120,7 +120,7 @@
   2. Create new Qdrant collection `mattervault_documents` with 1024 dimensions
   3. Update n8n ingestion workflow to use `bge-m3`
   4. Re-ingest all documents (maintenance window)
-  5. Switch chat workflow to query v3 collection
+  5. Switch chat workflow to query new collection
 - Effort: 4-6 hours (requires full re-index)
 - Risk: Medium (breaking change, needs validation)
 

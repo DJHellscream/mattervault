@@ -28,7 +28,7 @@ Mattervault employs a 5-zone modular architecture:
 │                           ORCHESTRATION LAYER                                │
 ├──────────────────────────────────────────────────────────────────────────────┤
 │                             n8n (5678)                                       │
-│         Webhook-driven workflows: Ingestion V2, Chat V5, Audit              │
+│         Webhook-driven workflows: Ingestion, Chat, Audit                    │
 └──────────────┬───────────────────────────────────────────────────────────────┘
                │
 ┌──────────────▼───────────────────────────────────────────────────────────────┐
@@ -102,7 +102,7 @@ Mattervault employs a 5-zone modular architecture:
          │ Webhook: document_added
          ▼
 ┌───────────────────┐
-│ n8n Ingestion V2  │
+│ n8n Ingestion     │
 │ - Download PDF    │
 │ - Send to Docling │
 └────────┬──────────┘
@@ -154,7 +154,7 @@ User Question + Family Selection
          │
          ▼
 ┌───────────────────┐
-│ n8n Chat V5       │
+│ n8n Chat          │
 │ - Conversation    │
 │ - History (10 msg)│
 └────────┬──────────┘
@@ -215,7 +215,7 @@ User Question + Family Selection
 | Endpoint | Trigger |
 |----------|---------|
 | `/webhook/document-added` | Paperless document_added |
-| `/webhook/chat-api-v3` | Chat-UI message submission |
+| `/webhook/chat-api` | Chat-UI message submission |
 
 ### Qdrant API (Port 6333)
 

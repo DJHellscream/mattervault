@@ -243,7 +243,7 @@ do_test() {
         echo ""
         info "Test: $name"
 
-        RESPONSE=$(curl -sf --max-time 120 "$N8N_URL/webhook/chat-api-v3" \
+        RESPONSE=$(curl -sf --max-time 120 "$N8N_URL/webhook/chat-api" \
             -H "Content-Type: application/json" \
             -d "{\"question\":\"$question\",\"family_id\":\"morrison\",\"user_id\":\"$USER_ID\"}" 2>&1 || echo '{"error":"timeout"}')
 
@@ -304,7 +304,7 @@ do_sync_tests() {
 
     if [ -n "$DOC_ID" ] && [ "$DOC_ID" != "null" ]; then
         # Trigger re-ingestion
-        curl -sf -X POST "$N8N_URL/webhook/document-added-v2" \
+        curl -sf -X POST "$N8N_URL/webhook/document-added" \
             -H "Content-Type: application/json" \
             -d "{\"doc_url\":\"http://mattervault:8000/api/documents/$DOC_ID/\"}" >/dev/null
 
@@ -728,7 +728,7 @@ do_prompt_quality_tests() {
     # Test 1: Off-topic question should be declined
     echo ""
     info "Test: off-topic question rejection"
-    RESPONSE=$(curl -s --max-time 120 "$N8N_URL/webhook/chat-api-v3" \
+    RESPONSE=$(curl -s --max-time 120 "$N8N_URL/webhook/chat-api" \
         -H "Content-Type: application/json" \
         -d "{\"question\":\"What is the capital of France?\",\"family_id\":\"morrison\",\"user_id\":\"$USER_ID\",\"conversation_id\":\"test-grounding-$(date +%s)\"}" 2>/dev/null || echo '{"error":"timeout"}')
 
@@ -745,7 +745,7 @@ do_prompt_quality_tests() {
 
     # Test 2: On-topic question should include citations
     info "Test: citation format in on-topic response"
-    RESPONSE2=$(curl -s --max-time 120 "$N8N_URL/webhook/chat-api-v3" \
+    RESPONSE2=$(curl -s --max-time 120 "$N8N_URL/webhook/chat-api" \
         -H "Content-Type: application/json" \
         -d "{\"question\":\"What documents do we have for this family?\",\"family_id\":\"morrison\",\"user_id\":\"$USER_ID\",\"conversation_id\":\"test-citations-$(date +%s)\"}" 2>/dev/null || echo '{"error":"timeout"}')
 
@@ -803,7 +803,7 @@ _run_test_category() {
             '{question: $q, family_id: $f, user_id: $u, conversation_id: $c}')
 
         local response output
-        response=$(curl -sf --max-time 120 "$N8N_URL/webhook/chat-api-v3" \
+        response=$(curl -sf --max-time 120 "$N8N_URL/webhook/chat-api" \
             -H "Content-Type: application/json" \
             -d "$payload" 2>/dev/null || echo '{"error":"timeout"}')
 
@@ -946,7 +946,7 @@ do_ingestion_status_tests() {
 
     # Test 3: Verify ingestion workflow JSON has tag management nodes
     info "Test: Ingestion workflow has tag management nodes"
-    WF_FILE="/e2e/../n8n-workflows/document-ingestion-v2.json"
+    WF_FILE="/e2e/../n8n-workflows/document-ingestion.json"
     if [ -f "$WF_FILE" ]; then
         if grep -q "Tag: Processing" "$WF_FILE" && grep -q "Tag: AI Ready" "$WF_FILE"; then
             pass "Ingestion workflow has tag management nodes"
@@ -994,7 +994,7 @@ do_large_pdf_tests() {
 
     # Test 2: Docling timeout is sufficient for large PDFs (>= 600s)
     info "Test: Docling timeout >= 600s"
-    WF_FILE="/files/n8n-workflows/document-ingestion-v2.json"
+    WF_FILE="/files/n8n-workflows/document-ingestion.json"
     if [ -f "$WF_FILE" ]; then
         TIMEOUT=$(jq -r '
             (if type == "array" then .[0] else . end).nodes[]
@@ -1081,7 +1081,7 @@ run_audio_ingestion_tests() {
 
     # Test 2: Ingestion workflow includes audio in convert_from_formats
     info "Test: Ingestion workflow includes audio in convert_from_formats"
-    WORKFLOW_FILE="/files/n8n-workflows/document-ingestion-v2.json"
+    WORKFLOW_FILE="/files/n8n-workflows/document-ingestion.json"
     if [ -f "$WORKFLOW_FILE" ]; then
         HAS_AUDIO=$(jq -r '
             (if type == "array" then .[0] else . end).nodes[]

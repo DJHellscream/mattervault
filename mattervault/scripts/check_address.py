@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check if Harold's address exists in the v2 collection"""
+"""Check if Harold's address exists in the collection"""
 
 import json
 import subprocess

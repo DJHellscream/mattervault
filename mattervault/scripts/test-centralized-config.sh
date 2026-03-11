@@ -360,7 +360,7 @@ if [ "$VECTOR_COUNT" -gt 0 ]; then
         else
         echo -e "  ${BLUE}→${NC} Using user_id=$USER_ID"
 
-        CHAT_RESPONSE=$(curl -sf --max-time 120 -X POST "$N8N_WEBHOOK_URL/webhook/chat-api-v3" \
+        CHAT_RESPONSE=$(curl -sf --max-time 120 -X POST "$N8N_WEBHOOK_URL/webhook/chat-api" \
             -H "Content-Type: application/json" \
             -d "{
                 \"question\": \"What documents are available?\",

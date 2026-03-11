@@ -314,7 +314,7 @@ services:
       - PAPERLESS_USER=${PAPERLESS_USER:-admin}
       - PAPERLESS_PASS=${PAPERLESS_ADMIN_PASS:-mattervault2025}
       - QDRANT_URL=http://mattermemory:6333
-      - N8N_WEBHOOK_URL=${N8N_INTERNAL_URL:-http://matterlogic:5678}/webhook/chat-api-v3
+      - N8N_WEBHOOK_URL=${N8N_INTERNAL_URL:-http://matterlogic:5678}/webhook/chat-api
       - CHATUI_DB_HOST=matterdb-chatui
       - CHATUI_DB_PORT=5432
       - CHATUI_DB_NAME=chatui

@@ -242,7 +242,7 @@ run_chat_test() {
     info "Testing: $test_name"
 
     # Call n8n webhook directly (more reliable than streaming endpoint)
-    RESPONSE=$(curl -s -X POST "${N8N_URL}/webhook/chat-api-v3" \
+    RESPONSE=$(curl -s -X POST "${N8N_URL}/webhook/chat-api" \
         -H "Content-Type: application/json" \
         -d "{\"question\":\"$question\",\"family_id\":\"$TEST_FAMILY\",\"user_id\":\"$USER_ID\"}" \
         --max-time 120 2>/dev/null || echo '{"error":"timeout"}')
@@ -265,7 +265,7 @@ run_chat_test() {
         echo "    Got: ${OUTPUT:0:200}"
     fi
 
-    # Check for conversation_id (V5 persistence)
+    # Check for conversation_id (persistence)
     CONV_ID=$(echo "$RESPONSE" | grep -o '"conversation_id":"[^"]*"' | cut -d'"' -f4 || echo "")
     if [[ -n "$CONV_ID" ]]; then
         info "  Conversation ID: $CONV_ID"
