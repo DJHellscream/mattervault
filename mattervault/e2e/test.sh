@@ -1,15 +1,16 @@
 #!/bin/bash
 # ==============================================================================
 # Mattervault E2E Test - Runs INSIDE Docker network
-# Usage: docker exec mattertest /e2e/test.sh [reset|test|full|sync|audit|hardening|prompt|all]
-#   reset     - Clear all data
-#   test      - Run tests only (use existing data) + prompt quality
-#   full      - Reset + ingest + test (default)
-#   sync      - Run document sync tests
-#   audit     - Run audit system tests
-#   hardening - Family isolation hardening tests (tenant index, pre-consume, reconciliation, dashboard)
-#   prompt    - Prompt quality tests (off-topic rejection, citation format)
-#   all       - Full test suite including sync + audit + hardening + prompt
+# Usage: docker exec mattertest /e2e/test.sh [reset|test|full|sync|audit|hardening|prompt|hallucination|all]
+#   reset         - Clear all data
+#   test          - Run tests only (use existing data) + prompt quality + hallucination
+#   full          - Reset + ingest + test (default)
+#   sync          - Run document sync tests
+#   audit         - Run audit system tests
+#   hardening     - Family isolation hardening tests (tenant index, pre-consume, reconciliation, dashboard)
+#   prompt        - Prompt quality tests (off-topic rejection, citation format)
+#   hallucination - JSON-driven adversarial/factual/citation tests (grounding, factual accuracy, citations)
+#   all           - Full test suite including sync + audit + hardening + prompt + hallucination
 # ==============================================================================
 set -euo pipefail
 
@@ -757,6 +758,171 @@ do_prompt_quality_tests() {
 }
 
 # ==============================================================================
+# HALLUCINATION TESTS (JSON-driven adversarial + factual + citation tests)
+# ==============================================================================
+run_hallucination_tests() {
+    header "Hallucination Tests (JSON-driven)"
+
+    TEST_QUERIES_FILE="/e2e/test-queries.json"
+    if [ ! -f "$TEST_QUERIES_FILE" ]; then
+        fail "Test queries file not found: $TEST_QUERIES_FILE"
+        return 1
+    fi
+
+    # Get valid user_id
+    USER_ID=$(psql "$CHATUI_DB" -t -A -c "SELECT id FROM users WHERE paperless_username='admin' LIMIT 1" 2>/dev/null | tr -d '[:space:]')
+    if [ -z "$USER_ID" ]; then
+        fail "No admin user in ChatUI database"
+        info "Login via chat-ui first to create user"
+        return 1
+    fi
+    info "Using user_id: $USER_ID"
+
+    # --- Grounding Tests (OR logic: any pattern match = pass) ---
+    header "Grounding Tests (off-topic / fabrication rejection)"
+
+    GROUNDING_COUNT=$(jq '.grounding_tests | length' "$TEST_QUERIES_FILE")
+    for i in $(seq 0 $((GROUNDING_COUNT - 1))); do
+        TEST_NAME=$(jq -r ".grounding_tests[$i].name" "$TEST_QUERIES_FILE")
+        TEST_QUERY=$(jq -r ".grounding_tests[$i].query" "$TEST_QUERIES_FILE")
+        TEST_FAMILY=$(jq -r ".grounding_tests[$i].family_id" "$TEST_QUERIES_FILE")
+        CONV_ID="hallucination-grounding-${i}-$(date +%s%N)"
+
+        echo ""
+        info "Test: $TEST_NAME"
+
+        RESPONSE=$(curl -sf --max-time 120 "$N8N_URL/webhook/chat-api-v3" \
+            -H "Content-Type: application/json" \
+            -d "{\"question\":\"$TEST_QUERY\",\"family_id\":\"$TEST_FAMILY\",\"user_id\":\"$USER_ID\",\"conversation_id\":\"$CONV_ID\"}" 2>&1 || echo '{"error":"timeout"}')
+
+        OUTPUT=$(echo "$RESPONSE" | jq -r '.output // .message // "no output"' 2>/dev/null || echo "$RESPONSE")
+
+        # Check for workflow errors first
+        if echo "$OUTPUT" | grep -qiE "error in workflow|timeout|no output"; then
+            warn "$TEST_NAME (workflow error or timeout — retry later)"
+            sleep 2
+            continue
+        fi
+
+        # OR logic: any pattern match means the model correctly declined
+        MATCHED=0
+        PATTERNS_JSON=$(jq -r ".grounding_tests[$i].match_patterns[]" "$TEST_QUERIES_FILE")
+        while IFS= read -r pattern; do
+            if echo "$OUTPUT" | grep -qiE "$pattern"; then
+                MATCHED=1
+                break
+            fi
+        done <<< "$PATTERNS_JSON"
+
+        if [ "$MATCHED" -eq 1 ]; then
+            pass "$TEST_NAME"
+            echo "   ${OUTPUT:0:120}..."
+        else
+            fail "$TEST_NAME (model did not decline)"
+            echo "   Got: ${OUTPUT:0:200}"
+        fi
+
+        sleep 2
+    done
+
+    # --- Factual Tests (AND logic: ALL patterns must match) ---
+    header "Factual Accuracy Tests (known Morrison data)"
+
+    FACTUAL_COUNT=$(jq '.factual_tests | length' "$TEST_QUERIES_FILE")
+    for i in $(seq 0 $((FACTUAL_COUNT - 1))); do
+        TEST_NAME=$(jq -r ".factual_tests[$i].name" "$TEST_QUERIES_FILE")
+        TEST_QUERY=$(jq -r ".factual_tests[$i].query" "$TEST_QUERIES_FILE")
+        TEST_FAMILY=$(jq -r ".factual_tests[$i].family_id" "$TEST_QUERIES_FILE")
+        CONV_ID="hallucination-factual-${i}-$(date +%s%N)"
+
+        echo ""
+        info "Test: $TEST_NAME"
+
+        RESPONSE=$(curl -sf --max-time 120 "$N8N_URL/webhook/chat-api-v3" \
+            -H "Content-Type: application/json" \
+            -d "{\"question\":\"$TEST_QUERY\",\"family_id\":\"$TEST_FAMILY\",\"user_id\":\"$USER_ID\",\"conversation_id\":\"$CONV_ID\"}" 2>&1 || echo '{"error":"timeout"}')
+
+        OUTPUT=$(echo "$RESPONSE" | jq -r '.output // .message // "no output"' 2>/dev/null || echo "$RESPONSE")
+
+        # Check for workflow errors first
+        if echo "$OUTPUT" | grep -qiE "error in workflow|timeout|no output"; then
+            warn "$TEST_NAME (workflow error or timeout — retry later)"
+            sleep 2
+            continue
+        fi
+
+        # AND logic: ALL patterns must match
+        ALL_MATCHED=1
+        MISSING_PATTERN=""
+        PATTERNS_JSON=$(jq -r ".factual_tests[$i].match_patterns[]" "$TEST_QUERIES_FILE")
+        while IFS= read -r pattern; do
+            if ! echo "$OUTPUT" | grep -qiE "$pattern"; then
+                ALL_MATCHED=0
+                MISSING_PATTERN="$pattern"
+                break
+            fi
+        done <<< "$PATTERNS_JSON"
+
+        if [ "$ALL_MATCHED" -eq 1 ]; then
+            pass "$TEST_NAME"
+            echo "   ${OUTPUT:0:120}..."
+        else
+            fail "$TEST_NAME (missing: $MISSING_PATTERN)"
+            echo "   Got: ${OUTPUT:0:200}"
+        fi
+
+        sleep 2
+    done
+
+    # --- Citation Tests (pattern match) ---
+    header "Citation Format Tests"
+
+    CITATION_COUNT=$(jq '.citation_tests | length' "$TEST_QUERIES_FILE")
+    for i in $(seq 0 $((CITATION_COUNT - 1))); do
+        TEST_NAME=$(jq -r ".citation_tests[$i].name" "$TEST_QUERIES_FILE")
+        TEST_QUERY=$(jq -r ".citation_tests[$i].query" "$TEST_QUERIES_FILE")
+        TEST_FAMILY=$(jq -r ".citation_tests[$i].family_id" "$TEST_QUERIES_FILE")
+        CONV_ID="hallucination-citation-${i}-$(date +%s%N)"
+
+        echo ""
+        info "Test: $TEST_NAME"
+
+        RESPONSE=$(curl -sf --max-time 120 "$N8N_URL/webhook/chat-api-v3" \
+            -H "Content-Type: application/json" \
+            -d "{\"question\":\"$TEST_QUERY\",\"family_id\":\"$TEST_FAMILY\",\"user_id\":\"$USER_ID\",\"conversation_id\":\"$CONV_ID\"}" 2>&1 || echo '{"error":"timeout"}')
+
+        OUTPUT=$(echo "$RESPONSE" | jq -r '.output // .message // "no output"' 2>/dev/null || echo "$RESPONSE")
+
+        # Check for workflow errors first
+        if echo "$OUTPUT" | grep -qiE "error in workflow|timeout|no output"; then
+            warn "$TEST_NAME (workflow error or timeout — retry later)"
+            sleep 2
+            continue
+        fi
+
+        # Any pattern match = pass (same as grounding OR logic)
+        MATCHED=0
+        PATTERNS_JSON=$(jq -r ".citation_tests[$i].match_patterns[]" "$TEST_QUERIES_FILE")
+        while IFS= read -r pattern; do
+            if echo "$OUTPUT" | grep -qiE "$pattern"; then
+                MATCHED=1
+                break
+            fi
+        done <<< "$PATTERNS_JSON"
+
+        if [ "$MATCHED" -eq 1 ]; then
+            pass "$TEST_NAME"
+            echo "   ${OUTPUT:0:120}..."
+        else
+            fail "$TEST_NAME (citation format not found)"
+            echo "   Got: ${OUTPUT:0:200}"
+        fi
+
+        sleep 2
+    done
+}
+
+# ==============================================================================
 # MAIN
 # ==============================================================================
 MODE="${1:-full}"
@@ -776,6 +942,7 @@ case "$MODE" in
         do_test
         do_verify
         do_prompt_quality_tests
+        run_hallucination_tests
         ;;
     full)
         do_reset
@@ -783,6 +950,7 @@ case "$MODE" in
         do_test
         do_verify
         do_prompt_quality_tests
+        run_hallucination_tests
         ;;
     sync)
         do_sync_tests
@@ -796,18 +964,22 @@ case "$MODE" in
     prompt)
         do_prompt_quality_tests
         ;;
+    hallucination)
+        run_hallucination_tests
+        ;;
     all)
         do_reset
         do_ingest
         do_test
         do_verify
         do_prompt_quality_tests
+        run_hallucination_tests
         do_sync_tests
         do_audit_tests
         do_hardening_tests
         ;;
     *)
-        echo "Usage: $0 [reset|test|full|sync|audit|hardening|prompt|all]"
+        echo "Usage: $0 [reset|test|full|sync|audit|hardening|prompt|hallucination|all]"
         exit 1
         ;;
 esac

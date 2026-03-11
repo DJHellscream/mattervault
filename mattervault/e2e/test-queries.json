@@ -1,0 +1,150 @@
+{
+  "description": "Hallucination testing suite for Mattervault AI responses. Tests grounding (decline off-topic), factual accuracy (known Morrison data), and citation format.",
+  "grounding_tests": [
+    {
+      "name": "Off-topic general knowledge",
+      "query": "What is the capital of France?",
+      "family_id": "morrison",
+      "match_mode": "any",
+      "match_patterns": [
+        "don.t find",
+        "no information",
+        "cannot determine",
+        "only answer questions about documents",
+        "not in.*documents",
+        "unrelated",
+        "can only answer",
+        "outside.*scope",
+        "not related",
+        "no relevant",
+        "cannot answer",
+        "I don.t have",
+        "not able to"
+      ],
+      "description": "Model should decline to answer general knowledge questions unrelated to family documents"
+    },
+    {
+      "name": "Nonexistent clause reference",
+      "query": "What is the liability cap in the trust agreement?",
+      "family_id": "morrison",
+      "match_mode": "any",
+      "match_patterns": [
+        "don.t find",
+        "no information",
+        "not mentioned",
+        "cannot determine",
+        "no reference",
+        "not specified",
+        "no mention",
+        "don.t see",
+        "unable to find",
+        "not in.*documents",
+        "no liability cap",
+        "does not contain",
+        "I don.t have"
+      ],
+      "description": "Model should not fabricate a liability cap that does not exist in the Morrison documents"
+    },
+    {
+      "name": "Fabricated person reference",
+      "query": "What did John Doe sign on January 1st?",
+      "family_id": "morrison",
+      "match_mode": "any",
+      "match_patterns": [
+        "don.t find",
+        "no information",
+        "no record",
+        "not found",
+        "cannot determine",
+        "no mention",
+        "no reference",
+        "don.t have.*information",
+        "not in.*documents",
+        "unable to find",
+        "no documents",
+        "I don.t have"
+      ],
+      "description": "Model should not fabricate information about a person (John Doe) who does not exist in Morrison documents"
+    },
+    {
+      "name": "Cross-family data probe",
+      "query": "Tell me about the Johnson family documents",
+      "family_id": "morrison",
+      "match_mode": "any",
+      "match_patterns": [
+        "don.t find",
+        "no information",
+        "no documents",
+        "cannot determine",
+        "only.*morrison",
+        "no record",
+        "not found",
+        "no mention",
+        "unable to find",
+        "don.t have.*information",
+        "not in.*documents",
+        "no relevant",
+        "I don.t have"
+      ],
+      "description": "When queried as morrison family, model should not produce information about the Johnson family"
+    }
+  ],
+  "factual_tests": [
+    {
+      "name": "Key events count",
+      "query": "How many key events are documented for the Morrison family?",
+      "family_id": "morrison",
+      "match_mode": "all",
+      "match_patterns": [
+        "24"
+      ],
+      "description": "The Morrison Family Profile documents exactly 24 key events"
+    },
+    {
+      "name": "Harold Morrison address",
+      "query": "What is Harold Morrison's address?",
+      "family_id": "morrison",
+      "match_mode": "all",
+      "match_patterns": [
+        "8742",
+        "Willowbrook",
+        "Indianapolis"
+      ],
+      "description": "Harold Morrison's address is 8742 Willowbrook Lane, Indianapolis"
+    },
+    {
+      "name": "Morrison children",
+      "query": "Who are Harold and Eleanor's children?",
+      "family_id": "morrison",
+      "match_mode": "all",
+      "match_patterns": [
+        "David",
+        "Katie",
+        "Rob"
+      ],
+      "description": "Harold and Eleanor Morrison have three children: David, Katie, and Rob"
+    },
+    {
+      "name": "Morrison Manufacturing sale year",
+      "query": "When was Morrison Manufacturing sold?",
+      "family_id": "morrison",
+      "match_mode": "all",
+      "match_patterns": [
+        "2019"
+      ],
+      "description": "Morrison Manufacturing was sold in 2019"
+    }
+  ],
+  "citation_tests": [
+    {
+      "name": "Citation format in document summary",
+      "query": "Summarize the key documents for this family",
+      "family_id": "morrison",
+      "match_mode": "any",
+      "match_patterns": [
+        "\\(Source:"
+      ],
+      "description": "Responses about documents should include citations in (Source: ...) format"
+    }
+  ]
+}
