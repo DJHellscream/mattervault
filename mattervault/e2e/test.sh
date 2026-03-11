@@ -51,6 +51,18 @@ check_health() {
     curl -sf "$QDRANT_URL/collections" >/dev/null && pass "Qdrant" || fail "Qdrant not responding"
     psql "$CHATUI_DB" -c "SELECT 1" >/dev/null 2>&1 && pass "ChatUI DB" || fail "ChatUI DB not responding"
 
+    # Chat-UI health endpoint
+    CHAT_HEALTH=$(curl -sf http://matterchat:3000/health 2>/dev/null)
+    if [ $? -eq 0 ]; then
+      pass "Chat-UI health endpoint responding"
+      DB_STATUS=$(echo "$CHAT_HEALTH" | jq -r '.services.database')
+      REDIS_STATUS=$(echo "$CHAT_HEALTH" | jq -r '.services.redis')
+      [ "$DB_STATUS" = "true" ] && pass "Chat-UI database connected" || fail "Chat-UI database disconnected"
+      [ "$REDIS_STATUS" = "true" ] && pass "Chat-UI Redis connected" || fail "Chat-UI Redis disconnected"
+    else
+      fail "Chat-UI health endpoint not responding"
+    fi
+
     # Native services (host gateway)
     curl -sf "$OLLAMA_URL/api/tags" >/dev/null && pass "Ollama (native)" || fail "Ollama not responding"
     curl -sf "$DOCLING_URL/health" >/dev/null && pass "Docling (native)" || fail "Docling not responding"

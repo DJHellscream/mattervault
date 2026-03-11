@@ -4,15 +4,19 @@
   "description": "Chat UI for Mattervault document intelligence",
   "main": "src/index.js",
   "scripts": {
-    "start": "node src/index.js"
+    "start": "node src/index.js",
+    "test": "jest --forceExit --detectOpenHandles"
   },
   "dependencies": {
-    "express": "^4.21.0",
-    "pg": "^8.13.0",
-    "jsonwebtoken": "^9.0.2",
-    "ioredis": "^5.4.1",
     "cookie-parser": "^1.4.7",
+    "express": "^4.21.0",
     "express-rate-limit": "^7.5.0",
-    "form-data": "^4.0.1"
+    "form-data": "^4.0.1",
+    "ioredis": "^5.4.1",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.13.0"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
   }
 }

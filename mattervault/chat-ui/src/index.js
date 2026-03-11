@@ -10,6 +10,18 @@ const { createDocumentsRouter } = require('./routes/documents');
 const { waitForDatabase, runMigrations } = require('./migrations');
 const { requireAuth } = require('./middleware/auth');
 
+// Process-level error handlers — prevent silent crashes
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  // Don't exit — log and continue serving
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+  // Give time for logs to flush, then exit (Docker will restart)
+  setTimeout(() => process.exit(1), 1000);
+});
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
