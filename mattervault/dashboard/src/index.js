@@ -8,7 +8,45 @@ const { Scheduler } = require('./scheduler');
 const { createApiRouter } = require('./api');
 const { setupWebSocket } = require('./websocket');
 
-const config = require('../config.json');
+/**
+ * Build config by merging config.json template with environment variables
+ */
+function buildConfig() {
+  const template = require('../config.json');
+  const cfg = JSON.parse(JSON.stringify(template)); // deep clone
+
+  // Override service passwords/URLs from environment
+  for (const svc of cfg.services) {
+    if (svc.id === 'db-paperless' && process.env.PAPERLESS_DB_PASS) {
+      svc.password = process.env.PAPERLESS_DB_PASS;
+    }
+    if (svc.id === 'db-n8n' && process.env.N8N_DB_PASS) {
+      svc.password = process.env.N8N_DB_PASS;
+    }
+    if (svc.id === 'db-chatui' && process.env.CHATUI_DB_PASS) {
+      svc.password = process.env.CHATUI_DB_PASS;
+    }
+    if (svc.id === 'qdrant' && process.env.QDRANT_COLLECTION) {
+      svc.collection = process.env.QDRANT_COLLECTION;
+    }
+    if (svc.id === 'ollama' && process.env.OLLAMA_URL) {
+      svc.url = process.env.OLLAMA_URL + '/api/tags';
+    }
+    if (svc.id === 'docling' && process.env.DOCLING_URL) {
+      svc.url = process.env.DOCLING_URL + '/health';
+    }
+    if (svc.id === 'paperless') {
+      if (process.env.PAPERLESS_URL) svc.url = process.env.PAPERLESS_URL;
+    }
+    if (svc.id === 'qdrant') {
+      if (process.env.QDRANT_URL) svc.url = process.env.QDRANT_URL;
+    }
+  }
+
+  return cfg;
+}
+
+const config = buildConfig();
 
 const app = express();
 const PORT = process.env.PORT || 3000;

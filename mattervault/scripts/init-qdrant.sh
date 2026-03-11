@@ -63,8 +63,8 @@ if [ "$EXISTS" = "NO" ]; then
         -H "Content-Type: application/json" \
         -d '{
             "field_name": "family_id",
-            "field_schema": "keyword"
-        }' >/dev/null 2>&1 && echo "  ✓ family_id index" || echo "  ⚠ family_id index (may exist)"
+            "field_schema": {"type": "keyword", "is_tenant": true}
+        }' >/dev/null 2>&1 && echo "  ✓ family_id index (tenant-aware)" || echo "  ⚠ family_id index (may exist)"
 
     # Index for document_id (for document-level operations like delete)
     curl -sf -X PUT "$QDRANT_URL/collections/$COLLECTION_NAME/index" \

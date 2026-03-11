@@ -30,7 +30,7 @@ The E2E test runs **inside a Docker container** on the `matternet` network. This
 |------|---------------------|------|
 | Paperless | mattervault | 8000 |
 | n8n | matterlogic | 5678 |
-| Qdrant | qdrant | 6333 |
+| Qdrant | mattermemory | 6333 |
 | ChatUI DB | matterdb-chatui | 5432 |
 | Ollama | host.docker.internal | 11434 |
 | Docling | host.docker.internal | 5001 |
@@ -60,13 +60,13 @@ If you need to run tests manually inside the container:
 
 ```bash
 # Start the e2e container
-docker compose --profile test up -d e2e
+docker compose -f docker-compose.yml -f docker-compose.test.yml up -d mattertest
 
 # Run tests
-docker exec e2e-runner /e2e/test.sh full
+docker exec mattertest /e2e/test.sh full
 
 # Or interactively
-docker exec -it e2e-runner bash
+docker exec -it mattertest bash
 /e2e/test.sh test
 ```
 

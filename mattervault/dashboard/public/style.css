@@ -1349,3 +1349,71 @@ body::after {
     gap: 8px;
   }
 }
+
+/* Admin Actions */
+.admin-actions-section {
+  background: var(--surface-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 36px;
+}
+
+.admin-actions-row {
+  display: flex;
+  gap: 12px;
+}
+
+.admin-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: var(--surface-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.admin-btn:hover {
+  border-color: var(--accent-primary);
+  background: rgba(0, 212, 255, 0.05);
+}
+
+.admin-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.admin-btn.running {
+  border-color: var(--alert-warning);
+  color: var(--alert-warning);
+}
+
+.admin-btn.success {
+  border-color: var(--status-healthy);
+  color: var(--status-healthy);
+}
+
+.admin-btn.error {
+  border-color: var(--alert-critical);
+  color: var(--alert-critical);
+}
+
+.admin-btn-icon {
+  font-size: 1.1em;
+}
+
+.admin-btn.running .admin-btn-icon {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}

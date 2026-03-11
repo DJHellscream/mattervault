@@ -26,7 +26,7 @@ Configure Paperless-ngx to notify MatterVault when documents are updated.
    - **URL**: `http://matterlogic:5678/webhook/document-added-v2`
    - **Body**:
      ```json
-     {"doc_url": "http://paperless:8000/api/documents/{doc_pk}/", "title": "{title}"}
+     {"doc_url": "http://mattervault:8000/api/documents/{doc_pk}/", "title": "{title}"}
      ```
    - **Method**: POST
 

@@ -131,6 +131,20 @@
       </div>
     </section>
 
+    <!-- Admin Actions -->
+    <section class="admin-actions-section">
+      <div class="section-header">
+        <span class="section-marker">⚙</span>
+        <h2>ADMIN ACTIONS</h2>
+      </div>
+      <div class="admin-actions-row">
+        <button class="admin-btn" id="reconcileBtn" onclick="triggerReconciliation()">
+          <span class="admin-btn-icon">⟳</span>
+          <span class="admin-btn-label">Reconcile Now</span>
+        </button>
+      </div>
+    </section>
+
     <!-- System Stats Row -->
     <section class="system-stats-section">
       <div class="section-header">
@@ -842,6 +856,41 @@
         selectedService = null;
       }
     });
+
+    // Reconcile Now
+    async function triggerReconciliation() {
+      const btn = document.getElementById('reconcileBtn');
+      const label = btn.querySelector('.admin-btn-label');
+      const origText = label.textContent;
+
+      btn.disabled = true;
+      label.textContent = 'Running...';
+      btn.classList.add('running');
+
+      try {
+        const res = await fetch('/api/reconcile', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+          label.textContent = 'Triggered!';
+          btn.classList.remove('running');
+          btn.classList.add('success');
+        } else {
+          label.textContent = 'Failed';
+          btn.classList.remove('running');
+          btn.classList.add('error');
+        }
+      } catch (err) {
+        label.textContent = 'Failed';
+        btn.classList.remove('running');
+        btn.classList.add('error');
+      }
+
+      setTimeout(() => {
+        label.textContent = origText;
+        btn.disabled = false;
+        btn.classList.remove('success', 'error', 'running');
+      }, 3000);
+    }
 
     // Start
     init();

@@ -25,9 +25,11 @@ if [ -f "$SCRIPT_DIR/../.env" ]; then
     set +a
 fi
 
-# Configuration
+# Configuration (host-side URLs — convert Docker-internal hostnames to localhost)
 PAPERLESS_URL="${PAPERLESS_URL:-http://localhost:8000}"
+PAPERLESS_URL="${PAPERLESS_URL/mattervault:8000/localhost:8000}"
 QDRANT_URL="${QDRANT_URL:-http://localhost:6333}"
+QDRANT_URL="${QDRANT_URL/mattermemory:6333/localhost:6333}"
 N8N_CONTAINER="${N8N_CONTAINER:-matterlogic}"
 PAPERLESS_USER="${PAPERLESS_USER:-admin}"
 PAPERLESS_PASS="${PAPERLESS_ADMIN_PASS:-mattervault2025}"
@@ -89,7 +91,7 @@ fi
 # ==============================================================================
 header "Step 2: Qdrant Collection (V2 Hybrid)"
 
-COLLECTION="mattervault_documents_v2"
+COLLECTION="${QDRANT_COLLECTION:-mattervault_documents_v2}"
 EXISTS=$(curl -sf "$QDRANT_URL/collections/$COLLECTION" 2>/dev/null | grep -q "points_count" && echo "YES" || echo "NO")
 
 if [ "$EXISTS" = "NO" ]; then
@@ -112,11 +114,14 @@ if [ "$EXISTS" = "NO" ]; then
         }' >/dev/null || { fail "Failed to create collection"; exit 1; }
 
     # Create indexes
-    for field in family_id document_id; do
-        curl -sf -X PUT "$QDRANT_URL/collections/$COLLECTION/index" \
-            -H "Content-Type: application/json" \
-            -d "{\"field_name\":\"$field\",\"field_schema\":\"keyword\"}" >/dev/null 2>&1 || true
-    done
+    # family_id uses tenant-aware index for optimized per-family queries
+    curl -sf -X PUT "$QDRANT_URL/collections/$COLLECTION/index" \
+        -H "Content-Type: application/json" \
+        -d '{"field_name":"family_id","field_schema":{"type":"keyword","is_tenant":true}}' >/dev/null 2>&1 || true
+
+    curl -sf -X PUT "$QDRANT_URL/collections/$COLLECTION/index" \
+        -H "Content-Type: application/json" \
+        -d '{"field_name":"document_id","field_schema":"keyword"}' >/dev/null 2>&1 || true
 
     pass "Created $COLLECTION with indexes"
 else
@@ -128,6 +133,7 @@ fi
 # ==============================================================================
 header "Step 3: n8n Workflows"
 
+# Workflow files and their known IDs (for activation after import)
 WORKFLOWS=(
     "document-ingestion-v2.json"
     "mattervault-chat-v5.json"
@@ -136,12 +142,22 @@ WORKFLOWS=(
     "audit-archive.json"
 )
 
+WORKFLOW_IDS=()
+
 for wf in "${WORKFLOWS[@]}"; do
     WF_PATH="$WORKFLOW_DIR/$wf"
     if [ -f "$WF_PATH" ]; then
         info "Importing $wf..."
         docker cp "$WF_PATH" "$N8N_CONTAINER:/tmp/$wf"
         if docker exec "$N8N_CONTAINER" n8n import:workflow --input="/tmp/$wf" >/dev/null 2>&1; then
+            # Extract workflow ID from the JSON file for activation
+            WF_ID=$(python3 -c "
+import json, sys
+d = json.load(open('$WF_PATH'))
+if isinstance(d, list): d = d[0]
+print(d.get('id', ''))
+" 2>/dev/null || echo "")
+            [ -n "$WF_ID" ] && WORKFLOW_IDS+=("$WF_ID")
             pass "Imported $wf"
         else
             warn "Failed to import $wf (may already exist)"
@@ -151,10 +167,29 @@ for wf in "${WORKFLOWS[@]}"; do
     fi
 done
 
-info "Restarting n8n to activate workflows..."
+info "Restarting n8n to pick up imported workflows..."
+docker restart "$N8N_CONTAINER" >/dev/null 2>&1
+sleep 8
+
+# n8n import:workflow deactivates workflows regardless of the active flag in JSON.
+# Explicitly activate each imported workflow after restart.
+info "Activating workflows..."
+ACTIVATED=0
+for WF_ID in "${WORKFLOW_IDS[@]}"; do
+    if docker exec "$N8N_CONTAINER" n8n publish:workflow --id="$WF_ID" >/dev/null 2>&1; then
+        ACTIVATED=$((ACTIVATED + 1))
+    else
+        warn "Could not activate workflow $WF_ID"
+    fi
+done
+
+# Restart again so activations take effect
 docker restart "$N8N_CONTAINER" >/dev/null 2>&1
 sleep 5
-pass "n8n restarted"
+
+# Verify
+ACTIVE_COUNT=$(docker exec "$N8N_CONTAINER" n8n list:workflow --active=true 2>/dev/null | wc -l)
+pass "n8n ready — $ACTIVE_COUNT workflow(s) active"
 
 # ==============================================================================
 # STEP 4: Create Paperless Webhooks

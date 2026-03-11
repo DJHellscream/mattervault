@@ -17,7 +17,7 @@
       "port": 5432,
       "database": "paperless",
       "user": "paperless",
-      "password": "${PAPERLESS_DB_PASS:-paperless_secure_pass}",
+      "password": "",
       "interval": 30,
       "timeout": 5000
     },
@@ -29,7 +29,7 @@
       "port": 5432,
       "database": "n8n",
       "user": "n8n",
-      "password": "${N8N_DB_PASS:-n8n_secure_pass}",
+      "password": "",
       "interval": 30,
       "timeout": 5000
     },
@@ -41,7 +41,7 @@
       "port": 5432,
       "database": "chatui",
       "user": "chatui",
-      "password": "${CHATUI_DB_PASS:-chatui_secure_pass}",
+      "password": "",
       "interval": 30,
       "timeout": 5000
     },
@@ -73,7 +73,7 @@
       "id": "qdrant",
       "name": "Qdrant",
       "type": "qdrant",
-      "url": "http://qdrant:6333",
+      "url": "http://mattermemory:6333",
       "collection": "mattervault_documents_v2",
       "interval": 30,
       "timeout": 5000
@@ -90,7 +90,7 @@
       "id": "chat-ui",
       "name": "Chat UI",
       "type": "chatui",
-      "url": "http://mattervault-chat:3000/health",
+      "url": "http://matterchat:3000/health",
       "interval": 30,
       "timeout": 5000
     },

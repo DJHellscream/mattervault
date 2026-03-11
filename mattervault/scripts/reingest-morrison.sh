@@ -22,7 +22,7 @@ fi
 
 # Internal Docker network URLs (called via docker exec)
 PAPERLESS_URL="http://mattervault:8000"
-QDRANT_URL="http://qdrant:6333"
+QDRANT_URL="http://mattermemory:6333"
 CONTAINER="matterlogic"
 
 DEMO_DATA="/workspace/demo data/Morrison Demo Data"
@@ -156,7 +156,7 @@ const data = JSON.stringify({
   filter: { must: [{ key: 'family_id', match: { value: 'morrison' } }] }
 });
 const req = http.request({
-  hostname: 'qdrant',
+  hostname: 'mattermemory',
   port: 6333,
   path: '/collections/mattervault_documents_v2/points/delete',
   method: 'POST',

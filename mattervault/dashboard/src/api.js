@@ -211,6 +211,26 @@ function createApiRouter(storage, config, scheduler, healthChecker, broadcast, a
     }
   });
 
+  // POST /api/reconcile - trigger reconciliation webhook
+  router.post('/reconcile', async (req, res) => {
+    const n8nUrl = process.env.N8N_INTERNAL_URL || 'http://matterlogic:5678';
+    try {
+      const response = await fetch(`${n8nUrl}/webhook/document-reconciliation`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ trigger: 'manual', source: 'dashboard' })
+      });
+      if (response.ok) {
+        res.json({ success: true, message: 'Reconciliation triggered' });
+      } else {
+        res.status(502).json({ success: false, message: `n8n returned ${response.status}` });
+      }
+    } catch (err) {
+      console.error('Reconciliation trigger failed:', err.message);
+      res.status(502).json({ success: false, message: 'Could not reach n8n webhook' });
+    }
+  });
+
   return router;
 }
 

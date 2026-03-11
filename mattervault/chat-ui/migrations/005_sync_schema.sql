@@ -19,9 +19,9 @@ CREATE TABLE IF NOT EXISTS sync.reconciliation_state (
     error_message TEXT
 );
 
-CREATE INDEX idx_reconciliation_state_type ON sync.reconciliation_state(sync_type);
-CREATE INDEX idx_reconciliation_state_started ON sync.reconciliation_state(started_at DESC);
-CREATE INDEX idx_reconciliation_state_status ON sync.reconciliation_state(status);
+CREATE INDEX IF NOT EXISTS idx_reconciliation_state_type ON sync.reconciliation_state(sync_type);
+CREATE INDEX IF NOT EXISTS idx_reconciliation_state_started ON sync.reconciliation_state(started_at DESC);
+CREATE INDEX IF NOT EXISTS idx_reconciliation_state_status ON sync.reconciliation_state(status);
 
 -- Detailed log of each sync operation
 CREATE TABLE IF NOT EXISTS sync.reconciliation_log (
@@ -36,9 +36,9 @@ CREATE TABLE IF NOT EXISTS sync.reconciliation_log (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_reconciliation_log_run_id ON sync.reconciliation_log(run_id);
-CREATE INDEX idx_reconciliation_log_document_id ON sync.reconciliation_log(document_id);
-CREATE INDEX idx_reconciliation_log_created_at ON sync.reconciliation_log(created_at);
+CREATE INDEX IF NOT EXISTS idx_reconciliation_log_run_id ON sync.reconciliation_log(run_id);
+CREATE INDEX IF NOT EXISTS idx_reconciliation_log_document_id ON sync.reconciliation_log(document_id);
+CREATE INDEX IF NOT EXISTS idx_reconciliation_log_created_at ON sync.reconciliation_log(created_at);
 
 -- Function to get the last successful high-water mark
 CREATE OR REPLACE FUNCTION sync.get_last_high_water_mark()

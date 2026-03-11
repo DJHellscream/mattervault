@@ -14,8 +14,8 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 MODE="${1:-full}"
 
 echo "Building/starting e2e container..."
-docker compose --profile test build e2e 2>/dev/null
-docker compose --profile test up -d e2e 2>/dev/null
+docker compose -f docker-compose.yml -f docker-compose.test.yml build mattertest 2>/dev/null
+docker compose -f docker-compose.yml -f docker-compose.test.yml up -d mattertest 2>/dev/null
 
 echo "Running E2E test (mode: $MODE)..."
-docker exec e2e-runner /e2e/test.sh "$MODE"
+docker exec mattertest /e2e/test.sh "$MODE"

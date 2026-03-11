@@ -130,10 +130,10 @@ mkdir -p ./intake/smith ./intake/jones
 
 ```bash
 # Full E2E test suite
-docker exec e2e-runner /e2e/test.sh all
+docker exec mattertest /e2e/test.sh all
 
 # Quick smoke test
-docker exec e2e-runner /e2e/test.sh test
+docker exec mattertest /e2e/test.sh test
 
 # Health check
 ./scripts/health-check.sh

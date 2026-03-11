@@ -98,32 +98,58 @@ class MetricsCollector {
   }
 
   /**
-   * Get vector counts per family_id from Qdrant
+   * Get vector counts per family_id from Qdrant (dynamic discovery)
    */
   async getQdrantFamilyCounts(url, collection) {
-    const families = ['morrison', 'johnson']; // Known families
     const counts = {};
 
-    for (const family of families) {
-      try {
-        const response = await fetch(`${url}/collections/${collection}/points/count`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            filter: {
-              must: [{ key: 'family_id', match: { value: family } }]
-            },
-            exact: true
-          })
-        });
+    // Step 1: Discover unique family_ids by scrolling points
+    try {
+      const scrollResponse = await fetch(`${url}/collections/${collection}/points/scroll`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          limit: 500,
+          with_payload: { include: ['family_id'] },
+          with_vector: false
+        })
+      });
 
-        if (response.ok) {
-          const data = await response.json();
-          counts[family] = data.result?.count || 0;
+      if (!scrollResponse.ok) return counts;
+
+      const scrollData = await scrollResponse.json();
+      const points = scrollData.result?.points || [];
+      const familyIds = new Set();
+      for (const point of points) {
+        if (point.payload?.family_id) {
+          familyIds.add(point.payload.family_id);
         }
-      } catch (err) {
-        counts[family] = -1; // Error indicator
       }
+
+      // Step 2: Count each discovered family
+      for (const family of familyIds) {
+        try {
+          const response = await fetch(`${url}/collections/${collection}/points/count`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              filter: {
+                must: [{ key: 'family_id', match: { value: family } }]
+              },
+              exact: true
+            })
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            counts[family] = data.result?.count || 0;
+          }
+        } catch (err) {
+          counts[family] = -1; // Error indicator
+        }
+      }
+    } catch (err) {
+      // Discovery failed, return empty counts
     }
 
     return counts;
