@@ -74,7 +74,7 @@ search_request = {
 }
 
 search_resp = run_curl(
-    "http://mattermemory:6333/collections/mattervault_documents_v3/points/query",
+    "http://mattermemory:6333/collections/mattervault_documents/points/query",
     "POST",
     search_request
 )

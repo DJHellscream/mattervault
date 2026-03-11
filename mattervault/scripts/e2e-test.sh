@@ -176,7 +176,7 @@ else
 
     while [ $ELAPSED -lt $MAX_WAIT ]; do
         VECTOR_COUNT=$(docker exec matterlogic wget -q -O - \
-            "http://mattermemory:6333/collections/mattervault_documents_v3" 2>/dev/null | \
+            "http://mattermemory:6333/collections/mattervault_documents" 2>/dev/null | \
             grep -o '"points_count":[0-9]*' | cut -d: -f2 || echo "0")
 
         if [ "$VECTOR_COUNT" -gt 0 ]; then
@@ -327,7 +327,7 @@ echo -e "${YELLOW}=== Phase 5: Data Integrity ===${NC}"
 
 # Verify vector count matches expectations
 VECTOR_COUNT=$(docker exec matterlogic wget -q -O - \
-    "http://mattermemory:6333/collections/mattervault_documents_v3" 2>/dev/null | \
+    "http://mattermemory:6333/collections/mattervault_documents" 2>/dev/null | \
     grep -o '"points_count":[0-9]*' | cut -d: -f2 || echo "0")
 
 if [ "$VECTOR_COUNT" -gt 20 ]; then
@@ -346,7 +346,7 @@ const data = JSON.stringify({
 });
 const req = http.request({
   hostname: 'mattermemory', port: 6333,
-  path: '/collections/mattervault_documents_v3/points/scroll',
+  path: '/collections/mattervault_documents/points/scroll',
   method: 'POST',
   headers: { 'Content-Type': 'application/json', 'Content-Length': data.length }
 }, res => {

@@ -12,7 +12,7 @@
 #   hallucination    - JSON-driven adversarial/factual/citation tests (grounding, factual accuracy, citations)
 #   ingestion-status - Ingestion status tag tests (processing, ai_ready, ingestion_error)
 #   large-pdf        - Large PDF handling tests (PyPDF2, split-pdf.py, Docling timeout)
-#   embedding        - Embedding validation tests (collection v3, 1024d, bge-m3 model)
+#   embedding        - Embedding validation tests (collection, 1024d, bge-m3 model)
 #   audio            - Audio ingestion tests (Docling ASR, workflow config, Whisper support)
 #   all              - Full test suite including sync + audit + hardening + prompt + hallucination + ingestion-status + large-pdf + embedding + audio
 # ==============================================================================
@@ -126,18 +126,18 @@ do_reset() {
     # 2. Clear Qdrant
     info "Clearing Qdrant vectors..."
     curl -sf -X DELETE "$QDRANT_URL/collections/mattervault_documents" >/dev/null 2>&1 || true
-    curl -sf -X DELETE "$QDRANT_URL/collections/mattervault_documents_v3" >/dev/null 2>&1 || true
+    curl -sf -X DELETE "$QDRANT_URL/collections/mattervault_documents" >/dev/null 2>&1 || true
 
-    # Recreate V3 collection
-    curl -sf -X PUT "$QDRANT_URL/collections/mattervault_documents_v3" \
+    # Recreate collection
+    curl -sf -X PUT "$QDRANT_URL/collections/mattervault_documents" \
         -H "Content-Type: application/json" \
         -d '{"vectors":{"dense":{"size":1024,"distance":"Cosine"}},"sparse_vectors":{"bm25":{"modifier":"idf"}}}' >/dev/null
 
     # family_id uses tenant-aware index for optimized per-family queries
-    curl -sf -X PUT "$QDRANT_URL/collections/mattervault_documents_v3/index" \
+    curl -sf -X PUT "$QDRANT_URL/collections/mattervault_documents/index" \
         -H "Content-Type: application/json" \
         -d '{"field_name":"family_id","field_schema":{"type":"keyword","is_tenant":true}}' >/dev/null 2>&1 || true
-    curl -sf -X PUT "$QDRANT_URL/collections/mattervault_documents_v3/index" \
+    curl -sf -X PUT "$QDRANT_URL/collections/mattervault_documents/index" \
         -H "Content-Type: application/json" \
         -d '{"field_name":"document_id","field_schema":"keyword"}' >/dev/null 2>&1 || true
     pass "Qdrant cleared and recreated"
@@ -203,7 +203,7 @@ do_ingest() {
     # Wait for vectors
     info "Waiting for vector indexing..."
     for i in {1..30}; do
-        VECTOR_COUNT=$(curl -sf "$QDRANT_URL/collections/mattervault_documents_v3" | jq -r '.result.points_count // 0')
+        VECTOR_COUNT=$(curl -sf "$QDRANT_URL/collections/mattervault_documents" | jq -r '.result.points_count // 0')
         if [ "$VECTOR_COUNT" -gt 0 ]; then
             pass "Qdrant indexed $VECTOR_COUNT vectors"
             break
@@ -272,7 +272,7 @@ do_verify() {
     header "Data Verification"
 
     # Vector count
-    VECTORS=$(curl -sf "$QDRANT_URL/collections/mattervault_documents_v3" | jq -r '.result.points_count // 0')
+    VECTORS=$(curl -sf "$QDRANT_URL/collections/mattervault_documents" | jq -r '.result.points_count // 0')
     [ "$VECTORS" -gt 20 ] && pass "Vectors: $VECTORS" || warn "Low vector count: $VECTORS"
 
     # Audit logs
@@ -297,7 +297,7 @@ do_sync_tests() {
 
     # Test 1: Idempotent re-ingestion (no duplicates)
     info "Test: Idempotent re-ingestion"
-    BEFORE_COUNT=$(curl -sf "$QDRANT_URL/collections/mattervault_documents_v3" | jq -r '.result.points_count')
+    BEFORE_COUNT=$(curl -sf "$QDRANT_URL/collections/mattervault_documents" | jq -r '.result.points_count')
 
     # Get first document ID
     DOC_ID=$(curl -sf "$PAPERLESS_URL/api/documents/" -H "Authorization: Token $TOKEN" | jq -r '.results[0].id')
@@ -310,7 +310,7 @@ do_sync_tests() {
 
         sleep 60  # Wait for ingestion (Docling parsing + embedding can take time)
 
-        AFTER_COUNT=$(curl -sf "$QDRANT_URL/collections/mattervault_documents_v3" | jq -r '.result.points_count')
+        AFTER_COUNT=$(curl -sf "$QDRANT_URL/collections/mattervault_documents" | jq -r '.result.points_count')
 
         if [ "$BEFORE_COUNT" -eq "$AFTER_COUNT" ]; then
             pass "Idempotent re-ingestion (count unchanged: $BEFORE_COUNT)"
@@ -479,7 +479,7 @@ do_hardening_tests() {
     # Test 1: Qdrant family_id index has is_tenant: true
     # --------------------------------------------------------------------------
     info "Test: Qdrant family_id index is tenant-aware"
-    COLLECTION_INFO=$(curl -sf "$QDRANT_URL/collections/mattervault_documents_v3" 2>/dev/null)
+    COLLECTION_INFO=$(curl -sf "$QDRANT_URL/collections/mattervault_documents" 2>/dev/null)
     IS_TENANT=$(echo "$COLLECTION_INFO" | jq -r '.result.payload_schema.family_id.params.is_tenant // false' 2>/dev/null)
     if [ "$IS_TENANT" = "true" ]; then
         pass "family_id index has is_tenant: true"
@@ -680,9 +680,9 @@ do_hardening_tests() {
     # Test 15: Qdrant vectors have family_id in payload
     # --------------------------------------------------------------------------
     info "Test: Qdrant vectors have family_id payload"
-    VECTOR_COUNT=$(curl -sf "$QDRANT_URL/collections/mattervault_documents_v3" | jq -r '.result.points_count // 0')
+    VECTOR_COUNT=$(curl -sf "$QDRANT_URL/collections/mattervault_documents" | jq -r '.result.points_count // 0')
     if [ "$VECTOR_COUNT" -gt 0 ]; then
-        SAMPLE=$(curl -sf -X POST "$QDRANT_URL/collections/mattervault_documents_v3/points/scroll" \
+        SAMPLE=$(curl -sf -X POST "$QDRANT_URL/collections/mattervault_documents/points/scroll" \
             -H "Content-Type: application/json" \
             -d '{"limit":1,"with_payload":["family_id","document_id"],"with_vector":false}')
         SAMPLE_FAMILY=$(echo "$SAMPLE" | jq -r '.result.points[0].payload.family_id // empty' 2>/dev/null)
@@ -1034,13 +1034,13 @@ do_large_pdf_tests() {
 run_embedding_validation_tests() {
     header "Embedding Validation Tests"
 
-    # Test 1: Qdrant collection v3 exists
-    info "Test: Qdrant collection mattervault_documents_v3 exists"
-    COLLECTION_RESP=$(curl -sf "$QDRANT_URL/collections/mattervault_documents_v3" 2>/dev/null)
+    # Test 1: Qdrant collection exists
+    info "Test: Qdrant collection mattervault_documents exists"
+    COLLECTION_RESP=$(curl -sf "$QDRANT_URL/collections/mattervault_documents" 2>/dev/null)
     if echo "$COLLECTION_RESP" | jq -e '.result.status' >/dev/null 2>&1; then
-        pass "Qdrant collection mattervault_documents_v3 exists"
+        pass "Qdrant collection mattervault_documents exists"
     else
-        fail "Qdrant collection mattervault_documents_v3 not found"
+        fail "Qdrant collection mattervault_documents not found"
         return 1
     fi
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Test hybrid search on mattervault_documents_v3"""
+"""Test hybrid search on mattervault_documents"""
 
 import json
 import subprocess
@@ -82,7 +82,7 @@ def main():
     }
 
     search_response = run_curl(
-        "http://mattermemory:6333/collections/mattervault_documents_v3/points/query",
+        "http://mattermemory:6333/collections/mattervault_documents/points/query",
         "POST",
         search_request
     )

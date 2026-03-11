@@ -158,7 +158,7 @@ const data = JSON.stringify({
 const req = http.request({
   hostname: 'mattermemory',
   port: 6333,
-  path: '/collections/mattervault_documents_v3/points/delete',
+  path: '/collections/mattervault_documents/points/delete',
   method: 'POST',
   headers: { 'Content-Type': 'application/json', 'Content-Length': data.length }
 }, res => {

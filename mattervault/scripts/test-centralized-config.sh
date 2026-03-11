@@ -83,7 +83,7 @@ EXPECTED_N8N_VARS=(
     "OLLAMA_EMBEDDING_MODEL=bge-m3"
     "DOCLING_URL=http://host.docker.internal:5001"
     "QDRANT_URL=http://mattermemory:6333"
-    "QDRANT_COLLECTION=mattervault_documents_v3"
+    "QDRANT_COLLECTION=mattervault_documents"
     "PAPERLESS_INTERNAL_URL=http://mattervault:8000"
     "N8N_INTERNAL_URL=http://matterlogic:5678"
 )
@@ -336,14 +336,14 @@ done
 header "6. Smoke Test (Chat via n8n webhook)"
 
 # Check if Qdrant has any vectors (needed for chat to work)
-VECTOR_COUNT=$(curl -sf "$QDRANT_API_URL/collections/${QDRANT_COLLECTION:-mattervault_documents_v3}" 2>/dev/null | \
+VECTOR_COUNT=$(curl -sf "$QDRANT_API_URL/collections/${QDRANT_COLLECTION:-mattervault_documents}" 2>/dev/null | \
     python3 -c "import sys,json; print(json.load(sys.stdin).get('result',{}).get('points_count',0))" 2>/dev/null || echo "0")
 
 if [ "$VECTOR_COUNT" -gt 0 ]; then
     echo -e "  ${BLUE}→${NC} Qdrant has $VECTOR_COUNT vectors — attempting chat query..."
 
     # Get a family_id from Qdrant
-    FAMILY=$(curl -sf -X POST "$QDRANT_API_URL/collections/${QDRANT_COLLECTION:-mattervault_documents_v3}/points/scroll" \
+    FAMILY=$(curl -sf -X POST "$QDRANT_API_URL/collections/${QDRANT_COLLECTION:-mattervault_documents}/points/scroll" \
         -H "Content-Type: application/json" \
         -d '{"limit":1,"with_payload":{"include":["family_id"]},"with_vector":false}' 2>/dev/null | \
         python3 -c "import sys,json; pts=json.load(sys.stdin).get('result',{}).get('points',[]); print(pts[0]['payload']['family_id'] if pts else '')" 2>/dev/null || echo "")

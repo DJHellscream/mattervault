@@ -418,7 +418,7 @@ All configuration lives in `.env`. New deployment = `cp .env.example .env` + edi
 | `OLLAMA_URL` | `http://host.docker.internal:11434` | Ollama API endpoint |
 | `DOCLING_URL` | `http://host.docker.internal:5001` | Docling API endpoint |
 | `QDRANT_URL` | `http://mattermemory:6333` | Qdrant internal URL |
-| `QDRANT_COLLECTION` | `mattervault_documents_v3` | Qdrant collection name |
+| `QDRANT_COLLECTION` | `mattervault_documents` | Qdrant collection name |
 | `PAPERLESS_INTERNAL_URL` | `http://mattervault:8000` | Paperless internal URL |
 | `N8N_INTERNAL_URL` | `http://matterlogic:5678` | n8n internal URL |
 
@@ -548,7 +548,7 @@ docker exec mattertest /e2e/test.sh all
 
 ### Qdrant Collection
 
-- **Name**: `mattervault_documents_v3`
+- **Name**: `mattervault_documents`
 - **Dense vectors**: 1024 dims, Cosine
 - **Sparse vectors**: BM25 with IDF modifier
 - **Indexes**: `family_id` (keyword, `is_tenant: true`), `document_id` (keyword)

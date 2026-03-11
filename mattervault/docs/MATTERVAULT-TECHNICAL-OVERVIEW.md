@@ -126,7 +126,7 @@ Mattervault employs a 5-zone modular architecture:
          ▼
 ┌───────────────────┐
 │ Ollama Embed      │
-│ - Dense: 768-dim  │
+│ - Dense: 1024-dim │
 │ - Sparse: BM25    │
 └────────┬──────────┘
          │
@@ -221,10 +221,10 @@ User Question + Family Selection
 
 | Operation | Endpoint |
 |-----------|----------|
-| Collection info | `GET /collections/mattervault_documents_v3` |
-| Search | `POST /collections/mattervault_documents_v3/points/query` |
-| Upsert | `PUT /collections/mattervault_documents_v3/points` |
-| Delete | `DELETE /collections/mattervault_documents_v3/points` |
+| Collection info | `GET /collections/mattervault_documents` |
+| Search | `POST /collections/mattervault_documents/points/query` |
+| Upsert | `PUT /collections/mattervault_documents/points` |
+| Delete | `DELETE /collections/mattervault_documents/points` |
 
 ---
 
@@ -481,7 +481,7 @@ N8N_DB_PASS=<secure-password>
 ./scripts/health-check.sh
 
 # Qdrant collection info
-curl http://localhost:6333/collections/mattervault_documents_v3
+curl http://localhost:6333/collections/mattervault_documents
 
 # n8n workflow status
 curl http://localhost:5678/healthz

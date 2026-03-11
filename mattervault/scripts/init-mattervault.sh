@@ -5,7 +5,7 @@
 #
 # This script:
 #   1. Waits for all services to be healthy
-#   2. Creates Qdrant V3 collection with hybrid search schema
+#   2. Creates Qdrant collection with hybrid search schema
 #   3. Imports n8n workflows
 #   4. Creates ingestion status tags (processing, ai_ready, ingestion_error)
 #   5. Creates Paperless webhooks to n8n
@@ -90,9 +90,9 @@ fi
 # ==============================================================================
 # STEP 2: Initialize Qdrant Collection
 # ==============================================================================
-header "Step 2: Qdrant Collection (V3 Hybrid)"
+header "Step 2: Qdrant Collection (Hybrid Search)"
 
-COLLECTION="${QDRANT_COLLECTION:-mattervault_documents_v3}"
+COLLECTION="${QDRANT_COLLECTION:-mattervault_documents}"
 EXISTS=$(curl -sf "$QDRANT_URL/collections/$COLLECTION" 2>/dev/null | grep -q "points_count" && echo "YES" || echo "NO")
 
 if [ "$EXISTS" = "NO" ]; then

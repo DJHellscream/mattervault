@@ -19,7 +19,7 @@ def run_curl(url, method="GET", data=None):
 
 # Get all points
 response = run_curl(
-    "http://mattermemory:6333/collections/mattervault_documents_v3/points/scroll",
+    "http://mattermemory:6333/collections/mattervault_documents/points/scroll",
     "POST",
     {"limit": 100, "with_payload": True}
 )

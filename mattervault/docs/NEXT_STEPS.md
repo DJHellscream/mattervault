@@ -117,7 +117,7 @@
 - 8192 token context vs nomic's 2048 — handles longer chunks without truncation
 - Implementation:
   1. `ollama pull bge-m3`
-  2. Create new Qdrant collection `mattervault_documents_v3` with 1024 dimensions
+  2. Create new Qdrant collection `mattervault_documents` with 1024 dimensions
   3. Update n8n ingestion workflow to use `bge-m3`
   4. Re-ingest all documents (maintenance window)
   5. Switch chat workflow to query v3 collection
