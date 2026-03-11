@@ -1,3 +1,13 @@
+# Secrets
+.env
 
 # Git worktrees
 .worktrees/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Runtime data
+node_modules/
+*.log

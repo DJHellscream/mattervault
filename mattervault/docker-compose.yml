@@ -119,17 +119,19 @@ services:
         PAPERLESS_TASK_WORKERS: 4                                               # Parallel OCR/consumption
         PAPERLESS_THREADS_PER_WORKER: 2
         PAPERLESS_CONSUMER_IGNORE_PATTERNS: '[".DS_Store", "*.DS_Store"]'       # Ignore macOS junk files
-    # NOTE: Volume paths are absolute to allow management from within Claude's container environment.
-    # On a new machine, update "D:\CCC\mattervault" below to match your project location.
+        PAPERLESS_PRE_CONSUME_SCRIPT: /usr/src/paperless/scripts/pre-consume-validate.sh
+    # NOTE: Volume paths use MATTERVAULT_DATA_DIR from .env (default: current directory).
+    # On Windows, set MATTERVAULT_DATA_DIR=D:\CCC\mattervault (or your project path) in .env.
     volumes:
-      - D:\CCC\mattervault\paperless\data:/usr/src/paperless/data
-      - D:\CCC\mattervault\paperless\media:/usr/src/paperless/media
-      - D:\CCC\mattervault\paperless\export:/usr/src/paperless/export
-      - D:\CCC\mattervault\paperless\consume:/usr/src/paperless/consume
+      - ${MATTERVAULT_DATA_DIR:-.}/paperless/data:/usr/src/paperless/data
+      - ${MATTERVAULT_DATA_DIR:-.}/paperless/media:/usr/src/paperless/media
+      - ${MATTERVAULT_DATA_DIR:-.}/paperless/export:/usr/src/paperless/export
+      - ${MATTERVAULT_DATA_DIR:-.}/paperless/consume:/usr/src/paperless/consume
       # THE CLIENT'S INBOX - Family subfolders for multi-tenancy
       # Example: ./intake/morrison/, ./intake/johnson/
       # Subfolders become tags via PAPERLESS_CONSUMER_SUBDIRS_AS_TAGS
-      - D:\CCC\mattervault\intake:/usr/src/paperless/consume/intake  # Attorney drop-off folder
+      - ${MATTERVAULT_DATA_DIR:-.}/intake:/usr/src/paperless/consume/intake  # Attorney drop-off folder
+      - ${MATTERVAULT_DATA_DIR:-.}/scripts/pre-consume-validate.sh:/usr/src/paperless/scripts/pre-consume-validate.sh:ro
     networks:
       - matternet
 
@@ -189,12 +191,22 @@ services:
       N8N_BASIC_AUTH_PASSWORD: ${N8N_AUTH_PASS:-Mattervault2025}
       N8N_RUNNERS_DISABLED: false
       N8N_PUBLIC_API_ENABLED: "true"
-      # Note: Ollama model config is now in the workflow's Config node, not env vars
+      N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"  # Allow workflow $env.* expressions
+      # Service URLs and models (for workflow $env.* expressions)
+      OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
+      OLLAMA_CHAT_MODEL: ${OLLAMA_CHAT_MODEL:-qwen3:8b}
+      OLLAMA_RERANKER_MODEL: ${OLLAMA_RERANKER_MODEL:-qwen3:8b}
+      OLLAMA_EMBEDDING_MODEL: ${OLLAMA_EMBEDDING_MODEL:-nomic-embed-text}
+      DOCLING_URL: ${DOCLING_URL:-http://host.docker.internal:5001}
+      QDRANT_URL: ${QDRANT_URL:-http://mattermemory:6333}
+      QDRANT_COLLECTION: ${QDRANT_COLLECTION:-mattervault_documents_v2}
+      PAPERLESS_INTERNAL_URL: ${PAPERLESS_INTERNAL_URL:-http://mattervault:8000}
+      N8N_INTERNAL_URL: ${N8N_INTERNAL_URL:-http://matterlogic:5678}
       # Note: Sync schedule is configured directly in the n8n reconciliation workflow
     volumes:
       - n8n_data:/home/node/.n8n
-      - D:\CCC\mattervault\intake:/files/intake:ro  # Triggers
-      - D:\CCC\mattervault\paperless\consume:/files/paperless-consume  # Push files if needed
+      - ${MATTERVAULT_DATA_DIR:-.}/intake:/files/intake:ro  # Triggers
+      - ${MATTERVAULT_DATA_DIR:-.}/paperless/consume:/files/paperless-consume  # Push files if needed
       - ./audit-archives:/files/audit-archives  # Audit log archives (7-year retention)
     depends_on:
       - db-n8n
@@ -222,16 +234,16 @@ services:
 
   chat-ui:
     build: ./chat-ui
-    container_name: mattervault-chat
+    container_name: matterchat
     restart: always
     ports:
       - "3007:3000"
     environment:
-      - PAPERLESS_URL=http://mattervault:8000
-      - PAPERLESS_USER=admin
+      - PAPERLESS_URL=${PAPERLESS_INTERNAL_URL:-http://mattervault:8000}
+      - PAPERLESS_USER=${PAPERLESS_USER:-admin}
       - PAPERLESS_PASS=${PAPERLESS_ADMIN_PASS:-mattervault2025}
       - QDRANT_URL=http://mattermemory:6333
-      - N8N_WEBHOOK_URL=http://matterlogic:5678/webhook/chat-api-v3
+      - N8N_WEBHOOK_URL=${N8N_INTERNAL_URL:-http://matterlogic:5678}/webhook/chat-api-v3
       - CHATUI_DB_HOST=matterdb-chatui
       - CHATUI_DB_PORT=5432
       - CHATUI_DB_NAME=chatui
@@ -240,13 +252,13 @@ services:
       - REDIS_URL=redis://mattercache:6379/1
       - JWT_SECRET=${JWT_SECRET:-dev_jwt_secret_change_in_production}
       # Ollama configuration for streaming responses
-      - OLLAMA_URL=http://host.docker.internal:11434
-      - OLLAMA_MODEL=${OLLAMA_CHAT_MODEL:-llama3.1:8b}
+      - OLLAMA_URL=${OLLAMA_URL:-http://host.docker.internal:11434}
+      - OLLAMA_MODEL=${OLLAMA_CHAT_MODEL:-qwen3:8b}
       # Conversation context (sliding window)
       - CHAT_HISTORY_LIMIT=${CHAT_HISTORY_LIMIT:-10}
     volumes:
-      - D:\CCC\mattervault\chat-ui\public:/app/public
-      - D:\CCC\mattervault\chat-ui\src:/app/src
+      - ${MATTERVAULT_DATA_DIR:-.}/chat-ui/public:/app/public
+      - ${MATTERVAULT_DATA_DIR:-.}/chat-ui/src:/app/src
     depends_on:
       - paperless
       - qdrant
@@ -261,11 +273,22 @@ services:
   # ----------------------------------------------------------------------------
   health-dashboard:
     build: ./dashboard
-    container_name: mattervault-dashboard
+    container_name: matterdash
     ports:
       - "3006:3000"
     environment:
       - ALERT_WEBHOOK_URL=${ALERT_WEBHOOK_URL:-http://matterlogic:5678/webhook/system-alert}
+      - PAPERLESS_URL=${PAPERLESS_INTERNAL_URL:-http://mattervault:8000}
+      - PAPERLESS_USER=${PAPERLESS_USER:-admin}
+      - PAPERLESS_PASS=${PAPERLESS_ADMIN_PASS:-mattervault2025}
+      - QDRANT_URL=http://mattermemory:6333
+      - QDRANT_COLLECTION=${QDRANT_COLLECTION:-mattervault_documents_v2}
+      - N8N_DB_PASS=${N8N_DB_PASS:-n8n_secure_pass}
+      - PAPERLESS_DB_PASS=${PAPERLESS_DB_PASS:-paperless_secure_pass}
+      - CHATUI_DB_PASS=${CHATUI_DB_PASS:-chatui_secure_pass}
+      - OLLAMA_URL=${OLLAMA_URL:-http://host.docker.internal:11434}
+      - DOCLING_URL=${DOCLING_URL:-http://host.docker.internal:5001}
+      - N8N_INTERNAL_URL=${N8N_INTERNAL_URL:-http://matterlogic:5678}
     volumes:
       - dashboard_data:/app/data
     extra_hosts:
@@ -278,27 +301,6 @@ services:
       - redis
     networks:
       - matternet
-
-  # ----------------------------------------------------------------------------
-  # ZONE 6: E2E TEST RUNNER (optional - for testing)
-  # Usage: docker compose up -d e2e && docker exec e2e-runner /e2e/test.sh
-  # ----------------------------------------------------------------------------
-  e2e:
-    build: ./e2e
-    container_name: e2e-runner
-    profiles: ["test"]  # Only starts with: docker compose --profile test up -d
-    volumes:
-      - D:\CCC\mattervault\intake:/files/intake
-      - "D:\\CCC\\demo data:/files/demo:ro"
-    networks:
-      - matternet
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    depends_on:
-      - paperless
-      - n8n
-      - qdrant
-      - db-chatui
 
 # ------------------------------------------------------------------------------
 # NETWORKS & VOLUMES

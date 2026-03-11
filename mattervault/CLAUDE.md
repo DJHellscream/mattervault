@@ -15,8 +15,8 @@ Mattervault is a **private, air-gapped Document Intelligence System** built for 
 | **Paperless-ngx** | `mattervault` | `8000` | Document vault + OCR + user authentication |
 | **n8n** | `matterlogic` | `5678` | Workflow orchestration (ingestion + chat) |
 | **Qdrant** | `mattermemory` | `6333` | Vector database (hybrid search) |
-| **Chat-UI** | `mattervault-chat` | `3007` | Web frontend + API layer |
-| **Health Dashboard** | `mattervault-dashboard` | `3006` | System monitoring |
+| **Chat-UI** | `matterchat` | `3007` | Web frontend + API layer |
+| **Health Dashboard** | `matterdash` | `3006` | System monitoring |
 | **PostgreSQL** | `db-paperless`, `db-n8n`, `db-chatui` | `5432` | Databases |
 | **Redis** | `redis` | `6379` | Session cache |
 | **Ollama** | **Native (Windows)** | `11434` | LLM + embeddings |
@@ -90,9 +90,9 @@ User Question (Chat-UI)
 │  5. Generate BM25 Sparse Vector (hashCode tokenizer)                  │
 │  6. Hybrid Search (Qdrant RRF fusion, filtered by family_id)          │
 │  7. Keyword Pre-Filter (boost exact matches)                          │
-│  8. LLM Reranker (llama3.1:8b scores 0-10)                           │
+│  8. LLM Reranker (qwen3:8b scores 0-10)                                 │
 │  9. Build Prompt (top results + chat history)                         │
-│ 10. Generate Answer (llama3.1:8b)                                     │
+│ 10. Generate Answer (qwen3:8b)                                           │
 │ 11. Extract Citations                                                  │
 │ 12. Save Assistant Message (Postgres)                                  │
 │ 13. Log Audit (audit.chat_query_logs)                                 │
@@ -148,7 +148,7 @@ The trust was executed on March 15, 2024 [Morrison Trust 2024, p.4]
 
 ## 5. Multi-Tenancy (Family Isolation)
 
-Data isolation is enforced at query time via `family_id` filter.
+Data isolation is enforced at query time via `family_id` filter. The Qdrant `family_id` index uses `is_tenant: true` for optimized per-family disk I/O (Qdrant v1.11+).
 
 ### Qdrant Payload Schema
 
@@ -167,9 +167,11 @@ Data isolation is enforced at query time via `family_id` filter.
 ### Family ID Flow
 
 1. **Intake**: Subfolders per family (`./intake/morrison/`, `./intake/johnson/`)
-2. **Paperless**: `PAPERLESS_CONSUMER_SUBDIRS_AS_TAGS=true` auto-tags by folder
-3. **Ingestion**: n8n extracts family tag → stores as `family_id`
-4. **Chat**: User selects family → all queries filtered by `family_id`
+2. **Pre-Consume Validation**: `pre-consume-validate.sh` rejects docs from unrecognized folders (no matching Paperless tag)
+3. **Paperless**: `PAPERLESS_CONSUMER_SUBDIRS_AS_TAGS=true` auto-tags by folder
+4. **Ingestion**: n8n extracts family tag → stores as `family_id`
+5. **Chat**: User selects family → all queries filtered by `family_id`
+6. **Reconciliation**: Detects and corrects family_id mismatches (e.g., after tag rename)
 
 ## 6. Audit Logging
 
@@ -220,6 +222,7 @@ MatterVault keeps Qdrant vectors synchronized with Paperless using a hybrid appr
 | Document Added | Webhook | Instant |
 | Document Updated | Webhook | Instant |
 | Document Deleted | Reconciliation | ≤15 min |
+| Family Tag Renamed | Reconciliation | ≤15 min |
 
 ### How It Works
 
@@ -228,7 +231,9 @@ MatterVault keeps Qdrant vectors synchronized with Paperless using a hybrid appr
 3. **Scheduled Reconciliation**: Every 15 minutes, compares Paperless vs Qdrant
    - Deletes orphans (in Qdrant, not in Paperless)
    - Ingests missing (in Paperless, not in Qdrant)
+   - Fixes family_id mismatches (Qdrant payload update + ChatUI conversations update, no re-embedding)
 4. **Weekly Full Scan**: Sunday 2 AM, full comparison regardless of timestamps
+5. **Manual Trigger**: "Reconcile Now" button on dashboard or POST to `/webhook/document-reconciliation`
 
 ### Configuration
 
@@ -253,6 +258,8 @@ SELECT * FROM sync.reconciliation_log WHERE created_at > NOW() - INTERVAL '1 day
 | Document not syncing | Paperless workflow enabled? Check n8n executions |
 | Deleted doc still in chat | Wait for reconciliation or trigger manually |
 | Duplicates in Qdrant | Check delete step in ingestion workflow |
+| Family tag renamed, old name in chat | Wait for reconciliation or click "Reconcile Now" on dashboard |
+| Doc rejected from intake folder | Create matching tag in Paperless first (pre-consume validation) |
 
 ## 8. n8n Workflows
 
@@ -297,11 +304,11 @@ docker restart matterlogic
 
 ## 9. Models
 
-| Purpose | Model | Dimensions |
-|---------|-------|------------|
-| Embeddings | `nomic-embed-text` | 768 |
-| Chat/Generation | `llama3.1:8b` | - |
-| Reranking | `llama3.1:8b` | - |
+| Purpose | Model | Env Variable | Dimensions |
+|---------|-------|-------------|------------|
+| Embeddings | `nomic-embed-text` | `OLLAMA_EMBEDDING_MODEL` | 768 |
+| Chat/Generation | `qwen3:8b` | `OLLAMA_CHAT_MODEL` | - |
+| Reranking | `qwen3:8b` | `OLLAMA_RERANKER_MODEL` | - |
 
 ## 10. File Structure
 
@@ -336,7 +343,7 @@ docker restart matterlogic
 
 ## 11. Health Dashboard
 
-The health dashboard (`mattervault-dashboard:3006`) monitors all services.
+The health dashboard (`matterdash:3006`) monitors all services.
 
 ### Features
 
@@ -395,21 +402,52 @@ Dashboard detects issue → POST to n8n webhook → n8n sends email
 
 **Cooldown:** Alerts are rate-limited to prevent spam (default: 5 minutes per rule/service).
 
-## 12. Development
+## 12. Configuration
+
+All configuration lives in `.env`. New deployment = `cp .env.example .env` + edit values + `docker compose up -d` + `./scripts/init-mattervault.sh`.
+
+### Key Environment Variables
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `MATTERVAULT_DATA_DIR` | `.` | Base path for all volume mounts (Windows: `D:\CCC\mattervault`) |
+| `OLLAMA_CHAT_MODEL` | `qwen3:8b` | LLM for chat and reranking |
+| `OLLAMA_EMBEDDING_MODEL` | `nomic-embed-text` | Embedding model |
+| `OLLAMA_URL` | `http://host.docker.internal:11434` | Ollama API endpoint |
+| `DOCLING_URL` | `http://host.docker.internal:5001` | Docling API endpoint |
+| `QDRANT_URL` | `http://mattermemory:6333` | Qdrant internal URL |
+| `QDRANT_COLLECTION` | `mattervault_documents_v2` | Qdrant collection name |
+| `PAPERLESS_INTERNAL_URL` | `http://mattervault:8000` | Paperless internal URL |
+| `N8N_INTERNAL_URL` | `http://matterlogic:5678` | n8n internal URL |
+
+Service URLs and model names are passed to n8n (for workflow `$env.*` expressions) and the dashboard via `docker-compose.yml`. Database passwords are in `.env` and referenced with `${VAR:-default}` syntax.
+
+## 13. Development
 
 ### Fresh Installation
 
 ```bash
-# 1. Start Docker services
+# 1. Configure environment
+cp .env.example .env
+# Edit .env: set passwords, MATTERVAULT_DATA_DIR (if not current directory)
+
+# 2. Start native services (host machine)
+# Windows:  $env:OLLAMA_HOST="0.0.0.0"; ollama serve
+# Mac/Linux: OLLAMA_HOST=0.0.0.0 ollama serve
+# Docling:  docling-serve --host 0.0.0.0 --port 5001 --no-ui
+
+# 3. Pull AI models
+ollama pull qwen3:8b
+ollama pull nomic-embed-text
+
+# 4. Start Docker services
 docker compose up -d
 
-# 2. Run initialization script (creates Qdrant collection, imports n8n workflows, creates Paperless webhooks)
+# 5. Run initialization script (creates Qdrant collection, imports n8n workflows, creates Paperless webhooks)
 ./scripts/init-mattervault.sh
 
-# 3. Create intake folders for your families
+# 6. Create intake folders for your families
 mkdir -p ./intake/smith ./intake/jones
-
-# 4. Login to Paperless and configure consumer to watch intake folders
 ```
 
 ### Starting Services
@@ -427,21 +465,26 @@ docker compose up -d
 
 ### E2E Testing
 
+The E2E test runner lives in a separate compose file (`docker-compose.test.yml`) to keep the main stack clean.
+
 ```bash
+# Start the test container
+docker compose -f docker-compose.yml -f docker-compose.test.yml up -d mattertest
+
 # Full test suite (reset + ingest + chat tests)
-docker exec e2e-runner /e2e/test.sh full
+docker exec mattertest /e2e/test.sh full
 
 # Quick test (use existing data)
-docker exec e2e-runner /e2e/test.sh test
+docker exec mattertest /e2e/test.sh test
 
 # Document sync tests
-docker exec e2e-runner /e2e/test.sh sync
+docker exec mattertest /e2e/test.sh sync
 
 # Audit system tests
-docker exec e2e-runner /e2e/test.sh audit
+docker exec mattertest /e2e/test.sh audit
 
 # Complete suite (full + sync + audit)
-docker exec e2e-runner /e2e/test.sh all
+docker exec mattertest /e2e/test.sh all
 ```
 
 ### Key URLs
@@ -454,22 +497,23 @@ docker exec e2e-runner /e2e/test.sh all
 | n8n | http://localhost:5678 |
 | Qdrant | http://localhost:6333/dashboard |
 
-## 13. Security
+## 14. Security
 
 - NO external API calls for AI (everything local)
 - NO cloud storage integrations
 - All services on internal Docker network
-- Sensitive values in `.env`, never committed
+- `.env` excluded from git via `.gitignore` — never commit secrets
+- New deployments: `cp .env.example .env` then edit values
 - SQL injection protection via parameterized queries + escaping
 - JWT tokens with Redis session validation
 
-## 14. Known Issues
+## 15. Known Issues
 
 - Docling may timeout on PDFs >50 pages
 - Paperless webhooks require restart after n8n URL change
 - Ollama must run with `OLLAMA_HOST=0.0.0.0` on Windows
 
-## 15. Quick Reference
+## 16. Quick Reference
 
 ### Container Names
 
@@ -478,13 +522,13 @@ docker exec e2e-runner /e2e/test.sh all
 | Paperless | `mattervault` |
 | n8n | `matterlogic` |
 | Qdrant | `mattermemory` |
-| Chat-UI | `mattervault-chat` |
-| Dashboard | `mattervault-dashboard` |
+| Chat-UI | `matterchat` |
+| Dashboard | `matterdash` |
 | ChatUI DB | `matterdb-chatui` |
 | Paperless DB | `matterdb-paperless` |
 | n8n DB | `matterdb-n8n` |
 | Redis | `mattercache` |
-| E2E Runner | `e2e-runner` |
+| E2E Runner | `mattertest` |
 
 ### Database Schemas
 
@@ -499,3 +543,33 @@ docker exec e2e-runner /e2e/test.sh all
 - **Name**: `mattervault_documents_v2`
 - **Dense vectors**: 768 dims, Cosine
 - **Sparse vectors**: BM25 with IDF modifier
+- **Indexes**: `family_id` (keyword, `is_tenant: true`), `document_id` (keyword)
+
+## 17. Pre-Consume Validation
+
+Paperless calls `scripts/pre-consume-validate.sh` before ingesting any document. This prevents documents from unrecognized intake subfolders from being processed.
+
+### Behavior
+
+| Scenario | Result |
+|----------|--------|
+| File in `intake/morrison/` + tag "morrison" exists | Allowed |
+| File in `intake/newclient/` + no tag "newclient" | **Rejected** (file stays) |
+| File uploaded via Paperless UI (not intake/) | Allowed |
+| File in root consume folder | Allowed |
+| Paperless API unreachable | Allowed (fail open) |
+
+### How It Works
+
+1. Paperless sets `$DOCUMENT_SOURCE_PATH` and calls the script
+2. Script normalizes path with `realpath` (Paperless bug #1196 workaround)
+3. If not in `intake/*/` pattern → exit 0 (allow)
+4. Extracts family name from subfolder
+5. Queries `GET /api/tags/?name__iexact=<family>` using `PAPERLESS_ADMIN_PASSWORD`
+6. Tag exists → exit 0 (allow); tag missing → exit 1 (reject)
+
+### Configuration
+
+Set in `docker-compose.yml` under `paperless` service:
+- `PAPERLESS_PRE_CONSUME_SCRIPT: /usr/src/paperless/scripts/pre-consume-validate.sh`
+- Volume mount: `scripts/pre-consume-validate.sh` → `/usr/src/paperless/scripts/pre-consume-validate.sh:ro`

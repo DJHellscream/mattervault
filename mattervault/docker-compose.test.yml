@@ -1,0 +1,25 @@
+# ==============================================================================
+# MATTERVAULT E2E TEST RUNNER
+# ------------------------------------------------------------------------------
+# Separate compose file — keeps test infra out of the main stack.
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.test.yml up -d mattertest
+#   docker exec mattertest /e2e/test.sh full
+# ==============================================================================
+
+services:
+  mattertest:
+    build: ./e2e
+    container_name: mattertest
+    volumes:
+      - ${MATTERVAULT_DATA_DIR:-.}/intake:/files/intake
+      - "${MATTERVAULT_DATA_DIR:-.}/demo data:/files/demo:ro"
+    networks:
+      - matternet
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - paperless
+      - n8n
+      - qdrant
+      - db-chatui
