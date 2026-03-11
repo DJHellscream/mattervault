@@ -760,6 +760,103 @@ do_prompt_quality_tests() {
 # ==============================================================================
 # HALLUCINATION TESTS (JSON-driven adversarial + factual + citation tests)
 # ==============================================================================
+
+# Helper: run a single test category from test-queries.json
+# Usage: _run_test_category "category_key" "Category Label" "$USER_ID"
+_run_test_category() {
+    local category="$1"
+    local label="$2"
+    local user_id="$3"
+    local test_file="/e2e/test-queries.json"
+
+    header "$label"
+
+    local count
+    count=$(jq ".${category} | length" "$test_file" 2>/dev/null)
+    if [ -z "$count" ] || [ "$count" -eq 0 ]; then
+        warn "No ${category} tests found in $test_file"
+        return 0
+    fi
+
+    for i in $(seq 0 $((count - 1))); do
+        local test_name test_query test_family match_mode conv_id
+        test_name=$(jq -r ".${category}[$i].name" "$test_file")
+        test_query=$(jq -r ".${category}[$i].query" "$test_file")
+        test_family=$(jq -r ".${category}[$i].family_id" "$test_file")
+        match_mode=$(jq -r ".${category}[$i].match_mode" "$test_file")
+        conv_id="hallucination-${category}-${i}-$(date +%s%N)"
+
+        echo ""
+        info "Test: $test_name"
+
+        # Build JSON payload safely with jq (no shell interpolation in JSON)
+        local payload
+        payload=$(jq -n \
+            --arg q "$test_query" \
+            --arg f "$test_family" \
+            --arg u "$user_id" \
+            --arg c "$conv_id" \
+            '{question: $q, family_id: $f, user_id: $u, conversation_id: $c}')
+
+        local response output
+        response=$(curl -sf --max-time 120 "$N8N_URL/webhook/chat-api-v3" \
+            -H "Content-Type: application/json" \
+            -d "$payload" 2>/dev/null || echo '{"error":"timeout"}')
+
+        output=$(echo "$response" | jq -r '.output // .message // "no output"' 2>/dev/null || echo "$response")
+
+        # Check for workflow errors first
+        if echo "$output" | grep -qiE "error in workflow|timeout|no output"; then
+            warn "$test_name (workflow error or timeout — retry later)"
+            sleep 2
+            continue
+        fi
+
+        # Match logic driven by match_mode from JSON
+        local patterns_json
+        patterns_json=$(jq -r ".${category}[$i].match_patterns[]" "$test_file")
+
+        if [ "$match_mode" = "all" ]; then
+            # AND logic: ALL patterns must match
+            local all_matched=1 missing_pattern=""
+            while IFS= read -r pattern; do
+                if ! echo "$output" | grep -qiE "$pattern"; then
+                    all_matched=0
+                    missing_pattern="$pattern"
+                    break
+                fi
+            done <<< "$patterns_json"
+
+            if [ "$all_matched" -eq 1 ]; then
+                pass "$test_name"
+                echo "   ${output:0:120}..."
+            else
+                fail "$test_name (missing: $missing_pattern)"
+                echo "   Got: ${output:0:200}"
+            fi
+        else
+            # OR logic (default): any pattern match = pass
+            local matched=0
+            while IFS= read -r pattern; do
+                if echo "$output" | grep -qiE "$pattern"; then
+                    matched=1
+                    break
+                fi
+            done <<< "$patterns_json"
+
+            if [ "$matched" -eq 1 ]; then
+                pass "$test_name"
+                echo "   ${output:0:120}..."
+            else
+                fail "$test_name (no pattern matched)"
+                echo "   Got: ${output:0:200}"
+            fi
+        fi
+
+        sleep 2
+    done
+}
+
 run_hallucination_tests() {
     header "Hallucination Tests (JSON-driven)"
 
@@ -778,148 +875,9 @@ run_hallucination_tests() {
     fi
     info "Using user_id: $USER_ID"
 
-    # --- Grounding Tests (OR logic: any pattern match = pass) ---
-    header "Grounding Tests (off-topic / fabrication rejection)"
-
-    GROUNDING_COUNT=$(jq '.grounding_tests | length' "$TEST_QUERIES_FILE")
-    for i in $(seq 0 $((GROUNDING_COUNT - 1))); do
-        TEST_NAME=$(jq -r ".grounding_tests[$i].name" "$TEST_QUERIES_FILE")
-        TEST_QUERY=$(jq -r ".grounding_tests[$i].query" "$TEST_QUERIES_FILE")
-        TEST_FAMILY=$(jq -r ".grounding_tests[$i].family_id" "$TEST_QUERIES_FILE")
-        CONV_ID="hallucination-grounding-${i}-$(date +%s%N)"
-
-        echo ""
-        info "Test: $TEST_NAME"
-
-        RESPONSE=$(curl -sf --max-time 120 "$N8N_URL/webhook/chat-api-v3" \
-            -H "Content-Type: application/json" \
-            -d "{\"question\":\"$TEST_QUERY\",\"family_id\":\"$TEST_FAMILY\",\"user_id\":\"$USER_ID\",\"conversation_id\":\"$CONV_ID\"}" 2>&1 || echo '{"error":"timeout"}')
-
-        OUTPUT=$(echo "$RESPONSE" | jq -r '.output // .message // "no output"' 2>/dev/null || echo "$RESPONSE")
-
-        # Check for workflow errors first
-        if echo "$OUTPUT" | grep -qiE "error in workflow|timeout|no output"; then
-            warn "$TEST_NAME (workflow error or timeout — retry later)"
-            sleep 2
-            continue
-        fi
-
-        # OR logic: any pattern match means the model correctly declined
-        MATCHED=0
-        PATTERNS_JSON=$(jq -r ".grounding_tests[$i].match_patterns[]" "$TEST_QUERIES_FILE")
-        while IFS= read -r pattern; do
-            if echo "$OUTPUT" | grep -qiE "$pattern"; then
-                MATCHED=1
-                break
-            fi
-        done <<< "$PATTERNS_JSON"
-
-        if [ "$MATCHED" -eq 1 ]; then
-            pass "$TEST_NAME"
-            echo "   ${OUTPUT:0:120}..."
-        else
-            fail "$TEST_NAME (model did not decline)"
-            echo "   Got: ${OUTPUT:0:200}"
-        fi
-
-        sleep 2
-    done
-
-    # --- Factual Tests (AND logic: ALL patterns must match) ---
-    header "Factual Accuracy Tests (known Morrison data)"
-
-    FACTUAL_COUNT=$(jq '.factual_tests | length' "$TEST_QUERIES_FILE")
-    for i in $(seq 0 $((FACTUAL_COUNT - 1))); do
-        TEST_NAME=$(jq -r ".factual_tests[$i].name" "$TEST_QUERIES_FILE")
-        TEST_QUERY=$(jq -r ".factual_tests[$i].query" "$TEST_QUERIES_FILE")
-        TEST_FAMILY=$(jq -r ".factual_tests[$i].family_id" "$TEST_QUERIES_FILE")
-        CONV_ID="hallucination-factual-${i}-$(date +%s%N)"
-
-        echo ""
-        info "Test: $TEST_NAME"
-
-        RESPONSE=$(curl -sf --max-time 120 "$N8N_URL/webhook/chat-api-v3" \
-            -H "Content-Type: application/json" \
-            -d "{\"question\":\"$TEST_QUERY\",\"family_id\":\"$TEST_FAMILY\",\"user_id\":\"$USER_ID\",\"conversation_id\":\"$CONV_ID\"}" 2>&1 || echo '{"error":"timeout"}')
-
-        OUTPUT=$(echo "$RESPONSE" | jq -r '.output // .message // "no output"' 2>/dev/null || echo "$RESPONSE")
-
-        # Check for workflow errors first
-        if echo "$OUTPUT" | grep -qiE "error in workflow|timeout|no output"; then
-            warn "$TEST_NAME (workflow error or timeout — retry later)"
-            sleep 2
-            continue
-        fi
-
-        # AND logic: ALL patterns must match
-        ALL_MATCHED=1
-        MISSING_PATTERN=""
-        PATTERNS_JSON=$(jq -r ".factual_tests[$i].match_patterns[]" "$TEST_QUERIES_FILE")
-        while IFS= read -r pattern; do
-            if ! echo "$OUTPUT" | grep -qiE "$pattern"; then
-                ALL_MATCHED=0
-                MISSING_PATTERN="$pattern"
-                break
-            fi
-        done <<< "$PATTERNS_JSON"
-
-        if [ "$ALL_MATCHED" -eq 1 ]; then
-            pass "$TEST_NAME"
-            echo "   ${OUTPUT:0:120}..."
-        else
-            fail "$TEST_NAME (missing: $MISSING_PATTERN)"
-            echo "   Got: ${OUTPUT:0:200}"
-        fi
-
-        sleep 2
-    done
-
-    # --- Citation Tests (pattern match) ---
-    header "Citation Format Tests"
-
-    CITATION_COUNT=$(jq '.citation_tests | length' "$TEST_QUERIES_FILE")
-    for i in $(seq 0 $((CITATION_COUNT - 1))); do
-        TEST_NAME=$(jq -r ".citation_tests[$i].name" "$TEST_QUERIES_FILE")
-        TEST_QUERY=$(jq -r ".citation_tests[$i].query" "$TEST_QUERIES_FILE")
-        TEST_FAMILY=$(jq -r ".citation_tests[$i].family_id" "$TEST_QUERIES_FILE")
-        CONV_ID="hallucination-citation-${i}-$(date +%s%N)"
-
-        echo ""
-        info "Test: $TEST_NAME"
-
-        RESPONSE=$(curl -sf --max-time 120 "$N8N_URL/webhook/chat-api-v3" \
-            -H "Content-Type: application/json" \
-            -d "{\"question\":\"$TEST_QUERY\",\"family_id\":\"$TEST_FAMILY\",\"user_id\":\"$USER_ID\",\"conversation_id\":\"$CONV_ID\"}" 2>&1 || echo '{"error":"timeout"}')
-
-        OUTPUT=$(echo "$RESPONSE" | jq -r '.output // .message // "no output"' 2>/dev/null || echo "$RESPONSE")
-
-        # Check for workflow errors first
-        if echo "$OUTPUT" | grep -qiE "error in workflow|timeout|no output"; then
-            warn "$TEST_NAME (workflow error or timeout — retry later)"
-            sleep 2
-            continue
-        fi
-
-        # Any pattern match = pass (same as grounding OR logic)
-        MATCHED=0
-        PATTERNS_JSON=$(jq -r ".citation_tests[$i].match_patterns[]" "$TEST_QUERIES_FILE")
-        while IFS= read -r pattern; do
-            if echo "$OUTPUT" | grep -qiE "$pattern"; then
-                MATCHED=1
-                break
-            fi
-        done <<< "$PATTERNS_JSON"
-
-        if [ "$MATCHED" -eq 1 ]; then
-            pass "$TEST_NAME"
-            echo "   ${OUTPUT:0:120}..."
-        else
-            fail "$TEST_NAME (citation format not found)"
-            echo "   Got: ${OUTPUT:0:200}"
-        fi
-
-        sleep 2
-    done
+    _run_test_category "grounding_tests" "Grounding Tests (off-topic / fabrication rejection)" "$USER_ID"
+    _run_test_category "factual_tests" "Factual Accuracy Tests (known Morrison data)" "$USER_ID"
+    _run_test_category "citation_tests" "Citation Format Tests" "$USER_ID"
 }
 
 # ==============================================================================
