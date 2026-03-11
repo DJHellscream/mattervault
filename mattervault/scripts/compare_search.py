@@ -26,7 +26,7 @@ print(f"Query: {query}\n")
 
 # Get embedding
 embed_resp = run_curl("http://host.docker.internal:11434/api/embeddings", "POST",
-                      {"model": "nomic-embed-text", "prompt": query})
+                      {"model": "bge-m3", "prompt": query})
 embedding = json.loads(embed_resp)['embedding']
 
 # Generate sparse vector
@@ -50,7 +50,7 @@ dense_req = {
     "filter": filter_cond,
     "with_payload": True
 }
-dense_resp = json.loads(run_curl("http://mattermemory:6333/collections/mattervault_documents_v2/points/query", "POST", dense_req))
+dense_resp = json.loads(run_curl("http://mattermemory:6333/collections/mattervault_documents_v3/points/query", "POST", dense_req))
 for i, p in enumerate(dense_resp['result']['points']):
     text = p['payload'].get('text', '')[:100]
     has_addr = 'willowbrook' in text.lower() or '8742' in text
@@ -68,7 +68,7 @@ sparse_req = {
     "filter": filter_cond,
     "with_payload": True
 }
-sparse_resp = json.loads(run_curl("http://mattermemory:6333/collections/mattervault_documents_v2/points/query", "POST", sparse_req))
+sparse_resp = json.loads(run_curl("http://mattermemory:6333/collections/mattervault_documents_v3/points/query", "POST", sparse_req))
 for i, p in enumerate(sparse_resp['result']['points']):
     text = p['payload'].get('text', '')[:100]
     has_addr = 'willowbrook' in text.lower() or '8742' in text
@@ -79,7 +79,7 @@ for i, p in enumerate(sparse_resp['result']['points']):
 print("\n" + "=" * 60)
 print("Checking sparse vector for point 290012 (has 'Address:'):")
 print("=" * 60)
-point_resp = json.loads(run_curl("http://mattermemory:6333/collections/mattervault_documents_v2/points/290012", "GET"))
+point_resp = json.loads(run_curl("http://mattermemory:6333/collections/mattervault_documents_v3/points/290012", "GET"))
 point_data = point_resp['result']
 bm25 = point_data.get('vector', {}).get('bm25', {})
 print(f"Sparse indices count: {len(bm25.get('indices', []))}")

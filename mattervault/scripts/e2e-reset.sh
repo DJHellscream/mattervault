@@ -94,7 +94,7 @@ fi
 echo -e "${YELLOW}[2/5] Clearing Qdrant...${NC}"
 
 # Delete and recreate both collections
-for collection in mattervault_documents mattervault_documents_v2; do
+for collection in mattervault_documents mattervault_documents_v3; do
     docker exec matterlogic node -e "
 const http = require('http');
 const req = http.request({
@@ -110,12 +110,12 @@ done
 docker exec matterlogic node -e "
 const http = require('http');
 const data = JSON.stringify({
-  vectors: { dense: { size: 768, distance: 'Cosine' } },
+  vectors: { dense: { size: 1024, distance: 'Cosine' } },
   sparse_vectors: { bm25: { modifier: 'idf' } }
 });
 const req = http.request({
   hostname: 'mattermemory', port: 6333,
-  path: '/collections/mattervault_documents_v2',
+  path: '/collections/mattervault_documents_v3',
   method: 'PUT',
   headers: { 'Content-Type': 'application/json', 'Content-Length': data.length }
 }, res => { process.exit(res.statusCode < 300 ? 0 : 1); });
@@ -130,7 +130,7 @@ const http = require('http');
 const data = JSON.stringify({ field_name: '$field', field_schema: 'keyword' });
 const req = http.request({
   hostname: 'mattermemory', port: 6333,
-  path: '/collections/mattervault_documents_v2/index',
+  path: '/collections/mattervault_documents_v3/index',
   method: 'PUT',
   headers: { 'Content-Type': 'application/json', 'Content-Length': data.length }
 }, res => { process.exit(0); });
@@ -188,7 +188,7 @@ echo -e "  ${GREEN}✓ Intake folder cleared${NC}"
 echo -e "${YELLOW}[5/5] Verifying clean state...${NC}"
 
 # Check Qdrant
-VECTOR_COUNT=$(docker exec matterlogic wget -q -O - "http://mattermemory:6333/collections/mattervault_documents_v2" 2>/dev/null | grep -o '"points_count":[0-9]*' | cut -d: -f2 || echo "0")
+VECTOR_COUNT=$(docker exec matterlogic wget -q -O - "http://mattermemory:6333/collections/mattervault_documents_v3" 2>/dev/null | grep -o '"points_count":[0-9]*' | cut -d: -f2 || echo "0")
 echo "  Qdrant vectors: $VECTOR_COUNT"
 
 # Check conversations

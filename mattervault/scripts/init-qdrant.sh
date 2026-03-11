@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# Initialize Qdrant Collection for Mattervault (V2 Hybrid Schema)
-# Creates the mattervault_documents_v2 collection with dense + sparse vectors
+# Initialize Qdrant Collection for Mattervault (V3 Hybrid Schema)
+# Creates the mattervault_documents_v3 collection with dense + sparse vectors
 # Usage: ./scripts/init-qdrant.sh
 # ==============================================================================
 set -euo pipefail
 
 QDRANT_URL="${QDRANT_URL:-http://localhost:6333}"
-COLLECTION_NAME="mattervault_documents_v2"
+COLLECTION_NAME="mattervault_documents_v3"
 
 echo "=============================================="
-echo "  Mattervault Qdrant Collection Setup (V2)"
+echo "  Mattervault Qdrant Collection Setup (V3)"
 echo "=============================================="
 echo ""
 echo "Qdrant URL: $QDRANT_URL"
@@ -31,17 +31,17 @@ echo "Checking if collection exists..."
 EXISTS=$(curl -sf "$QDRANT_URL/collections/$COLLECTION_NAME" 2>/dev/null | grep -q "points_count" && echo "YES" || echo "NO")
 
 if [ "$EXISTS" = "NO" ]; then
-    echo "Collection does not exist. Creating V2 hybrid collection..."
+    echo "Collection does not exist. Creating V3 hybrid collection..."
 
     # Create collection with hybrid vector config:
-    # - Dense: 768 dims for nomic-embed-text
+    # - Dense: 1024 dims for bge-m3
     # - Sparse: BM25 with IDF modifier
     curl -sf -X PUT "$QDRANT_URL/collections/$COLLECTION_NAME" \
         -H "Content-Type: application/json" \
         -d '{
             "vectors": {
                 "dense": {
-                    "size": 768,
+                    "size": 1024,
                     "distance": "Cosine"
                 }
             },
@@ -94,8 +94,8 @@ echo ""
 echo "=============================================="
 echo "Setup complete!"
 echo ""
-echo "Collection schema (V2 Hybrid):"
-echo "  - Dense vectors: 768 dimensions (nomic-embed-text), Cosine"
+echo "Collection schema (V3 Hybrid):"
+echo "  - Dense vectors: 1024 dimensions (bge-m3), Cosine"
 echo "  - Sparse vectors: BM25 with IDF modifier"
 echo "  - Indexed fields: family_id, document_id"
 echo ""

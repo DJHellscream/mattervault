@@ -70,7 +70,7 @@ PDF dropped in ./intake/<family>/
            ┌───────────────┐                 ┌───────────────┐                 ┌───────────────┐
            │   Docling     │                 │    Ollama     │                 │    Qdrant     │
            │  (parse PDF)  │────────────────▶│  (embed)      │────────────────▶│  (store)      │
-           │  → Markdown   │                 │  nomic-embed  │                 │  dense + BM25 │
+           │  → Markdown   │                 │  bge-m3       │                 │  dense + BM25 │
            └───────────────┘                 └───────────────┘                 └───────────────┘
 ```
 
@@ -86,7 +86,7 @@ User Question (Chat-UI)
 │  1. Get/Create Conversation (Postgres)                                 │
 │  2. Save User Message (Postgres)                                       │
 │  3. Get Chat History (last 10 messages)                               │
-│  4. Embed Question (Ollama → 768-dim vector)                          │
+│  4. Embed Question (Ollama → 1024-dim vector)                         │
 │  5. Generate BM25 Sparse Vector (hashCode tokenizer)                  │
 │  6. Hybrid Search (Qdrant RRF fusion, filtered by family_id)          │
 │  7. Keyword Pre-Filter (boost exact matches)                          │
@@ -306,7 +306,7 @@ docker restart matterlogic
 
 | Purpose | Model | Env Variable | Dimensions |
 |---------|-------|-------------|------------|
-| Embeddings | `nomic-embed-text` | `OLLAMA_EMBEDDING_MODEL` | 768 |
+| Embeddings | `bge-m3` | `OLLAMA_EMBEDDING_MODEL` | 1024 |
 | Chat/Generation | `qwen3:8b` | `OLLAMA_CHAT_MODEL` | - |
 | Reranking | `qwen3:8b` | `OLLAMA_RERANKER_MODEL` | - |
 
@@ -412,11 +412,11 @@ All configuration lives in `.env`. New deployment = `cp .env.example .env` + edi
 |----------|---------|---------|
 | `MATTERVAULT_DATA_DIR` | `.` | Base path for all volume mounts (Windows: `D:\CCC\mattervault`) |
 | `OLLAMA_CHAT_MODEL` | `qwen3:8b` | LLM for chat and reranking |
-| `OLLAMA_EMBEDDING_MODEL` | `nomic-embed-text` | Embedding model |
+| `OLLAMA_EMBEDDING_MODEL` | `bge-m3` | Embedding model |
 | `OLLAMA_URL` | `http://host.docker.internal:11434` | Ollama API endpoint |
 | `DOCLING_URL` | `http://host.docker.internal:5001` | Docling API endpoint |
 | `QDRANT_URL` | `http://mattermemory:6333` | Qdrant internal URL |
-| `QDRANT_COLLECTION` | `mattervault_documents_v2` | Qdrant collection name |
+| `QDRANT_COLLECTION` | `mattervault_documents_v3` | Qdrant collection name |
 | `PAPERLESS_INTERNAL_URL` | `http://mattervault:8000` | Paperless internal URL |
 | `N8N_INTERNAL_URL` | `http://matterlogic:5678` | n8n internal URL |
 
@@ -438,7 +438,7 @@ cp .env.example .env
 
 # 3. Pull AI models
 ollama pull qwen3:8b
-ollama pull nomic-embed-text
+ollama pull bge-m3
 
 # 4. Start Docker services
 docker compose up -d
@@ -483,7 +483,10 @@ docker exec mattertest /e2e/test.sh sync
 # Audit system tests
 docker exec mattertest /e2e/test.sh audit
 
-# Complete suite (full + sync + audit)
+# Embedding validation tests
+docker exec mattertest /e2e/test.sh embedding
+
+# Complete suite (full + sync + audit + embedding + more)
 docker exec mattertest /e2e/test.sh all
 ```
 
@@ -540,8 +543,8 @@ docker exec mattertest /e2e/test.sh all
 
 ### Qdrant Collection
 
-- **Name**: `mattervault_documents_v2`
-- **Dense vectors**: 768 dims, Cosine
+- **Name**: `mattervault_documents_v3`
+- **Dense vectors**: 1024 dims, Cosine
 - **Sparse vectors**: BM25 with IDF modifier
 - **Indexes**: `family_id` (keyword, `is_tenant: true`), `document_id` (keyword)
 

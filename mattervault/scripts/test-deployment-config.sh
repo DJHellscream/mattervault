@@ -92,7 +92,7 @@ fi
 # --- Model references ---
 echo -e "\n  ${CYAN}[model consistency]${NC}"
 EXPECTED_CHAT_MODEL="qwen3:8b"
-EXPECTED_EMBED_MODEL="nomic-embed-text"
+EXPECTED_EMBED_MODEL="bge-m3"
 
 for file in .env.example docker-compose.yml; do
     if grep -q "OLLAMA_CHAT_MODEL.*${EXPECTED_CHAT_MODEL}" "$file"; then

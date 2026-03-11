@@ -54,7 +54,7 @@ class MetricsCollector {
    * Collect Qdrant vector database metrics
    */
   async collectQdrantMetrics(service) {
-    const collectionName = service.collection || 'mattervault_documents_v2';
+    const collectionName = service.collection || 'mattervault_documents_v3';
 
     // Get collection info
     const response = await fetch(`${service.url}/collections/${collectionName}`);

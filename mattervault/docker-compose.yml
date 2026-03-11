@@ -252,10 +252,10 @@ services:
       OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
       OLLAMA_CHAT_MODEL: ${OLLAMA_CHAT_MODEL:-qwen3:8b}
       OLLAMA_RERANKER_MODEL: ${OLLAMA_RERANKER_MODEL:-qwen3:8b}
-      OLLAMA_EMBEDDING_MODEL: ${OLLAMA_EMBEDDING_MODEL:-nomic-embed-text}
+      OLLAMA_EMBEDDING_MODEL: ${OLLAMA_EMBEDDING_MODEL:-bge-m3}
       DOCLING_URL: ${DOCLING_URL:-http://host.docker.internal:5001}
       QDRANT_URL: ${QDRANT_URL:-http://mattermemory:6333}
-      QDRANT_COLLECTION: ${QDRANT_COLLECTION:-mattervault_documents_v2}
+      QDRANT_COLLECTION: ${QDRANT_COLLECTION:-mattervault_documents_v3}
       PAPERLESS_INTERNAL_URL: ${PAPERLESS_INTERNAL_URL:-http://mattervault:8000}
       N8N_INTERNAL_URL: ${N8N_INTERNAL_URL:-http://matterlogic:5678}
       # Note: Sync schedule is configured directly in the n8n reconciliation workflow
@@ -353,7 +353,7 @@ services:
       - PAPERLESS_USER=${PAPERLESS_USER:-admin}
       - PAPERLESS_PASS=${PAPERLESS_ADMIN_PASS:-mattervault2025}
       - QDRANT_URL=http://mattermemory:6333
-      - QDRANT_COLLECTION=${QDRANT_COLLECTION:-mattervault_documents_v2}
+      - QDRANT_COLLECTION=${QDRANT_COLLECTION:-mattervault_documents_v3}
       - N8N_DB_PASS=${N8N_DB_PASS:-n8n_secure_pass}
       - PAPERLESS_DB_PASS=${PAPERLESS_DB_PASS:-paperless_secure_pass}
       - CHATUI_DB_PASS=${CHATUI_DB_PASS:-chatui_secure_pass}

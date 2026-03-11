@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Test hybrid search on mattervault_documents_v2"""
+"""Test hybrid search on mattervault_documents_v3"""
 
 import json
 import subprocess
@@ -36,7 +36,7 @@ def main():
     embed_response = run_curl(
         "http://host.docker.internal:11434/api/embeddings",
         "POST",
-        {"model": "nomic-embed-text", "prompt": query}
+        {"model": "bge-m3", "prompt": query}
     )
     embed_data = json.loads(embed_response)
     embedding = embed_data['embedding']
@@ -82,7 +82,7 @@ def main():
     }
 
     search_response = run_curl(
-        "http://mattermemory:6333/collections/mattervault_documents_v2/points/query",
+        "http://mattermemory:6333/collections/mattervault_documents_v3/points/query",
         "POST",
         search_request
     )

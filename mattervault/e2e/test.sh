@@ -1,7 +1,7 @@
 #!/bin/bash
 # ==============================================================================
 # Mattervault E2E Test - Runs INSIDE Docker network
-# Usage: docker exec mattertest /e2e/test.sh [reset|test|full|sync|audit|hardening|prompt|hallucination|ingestion-status|large-pdf|all]
+# Usage: docker exec mattertest /e2e/test.sh [reset|test|full|sync|audit|hardening|prompt|hallucination|ingestion-status|large-pdf|embedding|all]
 #   reset            - Clear all data
 #   test             - Run tests only (use existing data) + prompt quality + hallucination
 #   full             - Reset + ingest + test (default)
@@ -12,7 +12,8 @@
 #   hallucination    - JSON-driven adversarial/factual/citation tests (grounding, factual accuracy, citations)
 #   ingestion-status - Ingestion status tag tests (processing, ai_ready, ingestion_error)
 #   large-pdf        - Large PDF handling tests (PyPDF2, split-pdf.py, Docling timeout)
-#   all              - Full test suite including sync + audit + hardening + prompt + hallucination + ingestion-status + large-pdf
+#   embedding        - Embedding validation tests (collection v3, 1024d, bge-m3 model)
+#   all              - Full test suite including sync + audit + hardening + prompt + hallucination + ingestion-status + large-pdf + embedding
 # ==============================================================================
 set -euo pipefail
 
@@ -124,18 +125,18 @@ do_reset() {
     # 2. Clear Qdrant
     info "Clearing Qdrant vectors..."
     curl -sf -X DELETE "$QDRANT_URL/collections/mattervault_documents" >/dev/null 2>&1 || true
-    curl -sf -X DELETE "$QDRANT_URL/collections/mattervault_documents_v2" >/dev/null 2>&1 || true
+    curl -sf -X DELETE "$QDRANT_URL/collections/mattervault_documents_v3" >/dev/null 2>&1 || true
 
-    # Recreate V2 collection
-    curl -sf -X PUT "$QDRANT_URL/collections/mattervault_documents_v2" \
+    # Recreate V3 collection
+    curl -sf -X PUT "$QDRANT_URL/collections/mattervault_documents_v3" \
         -H "Content-Type: application/json" \
-        -d '{"vectors":{"dense":{"size":768,"distance":"Cosine"}},"sparse_vectors":{"bm25":{"modifier":"idf"}}}' >/dev/null
+        -d '{"vectors":{"dense":{"size":1024,"distance":"Cosine"}},"sparse_vectors":{"bm25":{"modifier":"idf"}}}' >/dev/null
 
     # family_id uses tenant-aware index for optimized per-family queries
-    curl -sf -X PUT "$QDRANT_URL/collections/mattervault_documents_v2/index" \
+    curl -sf -X PUT "$QDRANT_URL/collections/mattervault_documents_v3/index" \
         -H "Content-Type: application/json" \
         -d '{"field_name":"family_id","field_schema":{"type":"keyword","is_tenant":true}}' >/dev/null 2>&1 || true
-    curl -sf -X PUT "$QDRANT_URL/collections/mattervault_documents_v2/index" \
+    curl -sf -X PUT "$QDRANT_URL/collections/mattervault_documents_v3/index" \
         -H "Content-Type: application/json" \
         -d '{"field_name":"document_id","field_schema":"keyword"}' >/dev/null 2>&1 || true
     pass "Qdrant cleared and recreated"
@@ -201,7 +202,7 @@ do_ingest() {
     # Wait for vectors
     info "Waiting for vector indexing..."
     for i in {1..30}; do
-        VECTOR_COUNT=$(curl -sf "$QDRANT_URL/collections/mattervault_documents_v2" | jq -r '.result.points_count // 0')
+        VECTOR_COUNT=$(curl -sf "$QDRANT_URL/collections/mattervault_documents_v3" | jq -r '.result.points_count // 0')
         if [ "$VECTOR_COUNT" -gt 0 ]; then
             pass "Qdrant indexed $VECTOR_COUNT vectors"
             break
@@ -270,7 +271,7 @@ do_verify() {
     header "Data Verification"
 
     # Vector count
-    VECTORS=$(curl -sf "$QDRANT_URL/collections/mattervault_documents_v2" | jq -r '.result.points_count // 0')
+    VECTORS=$(curl -sf "$QDRANT_URL/collections/mattervault_documents_v3" | jq -r '.result.points_count // 0')
     [ "$VECTORS" -gt 20 ] && pass "Vectors: $VECTORS" || warn "Low vector count: $VECTORS"
 
     # Audit logs
@@ -295,7 +296,7 @@ do_sync_tests() {
 
     # Test 1: Idempotent re-ingestion (no duplicates)
     info "Test: Idempotent re-ingestion"
-    BEFORE_COUNT=$(curl -sf "$QDRANT_URL/collections/mattervault_documents_v2" | jq -r '.result.points_count')
+    BEFORE_COUNT=$(curl -sf "$QDRANT_URL/collections/mattervault_documents_v3" | jq -r '.result.points_count')
 
     # Get first document ID
     DOC_ID=$(curl -sf "$PAPERLESS_URL/api/documents/" -H "Authorization: Token $TOKEN" | jq -r '.results[0].id')
@@ -308,7 +309,7 @@ do_sync_tests() {
 
         sleep 60  # Wait for ingestion (Docling parsing + embedding can take time)
 
-        AFTER_COUNT=$(curl -sf "$QDRANT_URL/collections/mattervault_documents_v2" | jq -r '.result.points_count')
+        AFTER_COUNT=$(curl -sf "$QDRANT_URL/collections/mattervault_documents_v3" | jq -r '.result.points_count')
 
         if [ "$BEFORE_COUNT" -eq "$AFTER_COUNT" ]; then
             pass "Idempotent re-ingestion (count unchanged: $BEFORE_COUNT)"
@@ -477,7 +478,7 @@ do_hardening_tests() {
     # Test 1: Qdrant family_id index has is_tenant: true
     # --------------------------------------------------------------------------
     info "Test: Qdrant family_id index is tenant-aware"
-    COLLECTION_INFO=$(curl -sf "$QDRANT_URL/collections/mattervault_documents_v2" 2>/dev/null)
+    COLLECTION_INFO=$(curl -sf "$QDRANT_URL/collections/mattervault_documents_v3" 2>/dev/null)
     IS_TENANT=$(echo "$COLLECTION_INFO" | jq -r '.result.payload_schema.family_id.params.is_tenant // false' 2>/dev/null)
     if [ "$IS_TENANT" = "true" ]; then
         pass "family_id index has is_tenant: true"
@@ -678,9 +679,9 @@ do_hardening_tests() {
     # Test 15: Qdrant vectors have family_id in payload
     # --------------------------------------------------------------------------
     info "Test: Qdrant vectors have family_id payload"
-    VECTOR_COUNT=$(curl -sf "$QDRANT_URL/collections/mattervault_documents_v2" | jq -r '.result.points_count // 0')
+    VECTOR_COUNT=$(curl -sf "$QDRANT_URL/collections/mattervault_documents_v3" | jq -r '.result.points_count // 0')
     if [ "$VECTOR_COUNT" -gt 0 ]; then
-        SAMPLE=$(curl -sf -X POST "$QDRANT_URL/collections/mattervault_documents_v2/points/scroll" \
+        SAMPLE=$(curl -sf -X POST "$QDRANT_URL/collections/mattervault_documents_v3/points/scroll" \
             -H "Content-Type: application/json" \
             -d '{"limit":1,"with_payload":["family_id","document_id"],"with_vector":false}')
         SAMPLE_FAMILY=$(echo "$SAMPLE" | jq -r '.result.points[0].payload.family_id // empty' 2>/dev/null)
@@ -1037,6 +1038,41 @@ for node in wf['nodes']:
 }
 
 # ==============================================================================
+# EMBEDDING VALIDATION TESTS
+# ==============================================================================
+run_embedding_validation_tests() {
+    header "Embedding Validation Tests"
+
+    # Test 1: Qdrant collection v3 exists
+    info "Test: Qdrant collection mattervault_documents_v3 exists"
+    COLLECTION_RESP=$(curl -sf "$QDRANT_URL/collections/mattervault_documents_v3" 2>/dev/null)
+    if echo "$COLLECTION_RESP" | jq -e '.result.status' >/dev/null 2>&1; then
+        pass "Qdrant collection mattervault_documents_v3 exists"
+    else
+        fail "Qdrant collection mattervault_documents_v3 not found"
+    fi
+
+    # Test 2: Vector dimensions = 1024
+    info "Test: Dense vector dimensions = 1024"
+    VECTOR_SIZE=$(echo "$COLLECTION_RESP" | jq -r '.result.config.params.vectors.dense.size // 0' 2>/dev/null)
+    if [ "${VECTOR_SIZE:-0}" -eq 1024 ]; then
+        pass "Dense vector dimensions = 1024 (bge-m3)"
+    else
+        fail "Dense vector dimensions = ${VECTOR_SIZE:-unknown} (expected 1024)"
+    fi
+
+    # Test 3: bge-m3 model available in Ollama
+    info "Test: bge-m3 model available in Ollama"
+    OLLAMA_HOST="${OLLAMA_URL:-http://host.docker.internal:11434}"
+    MODELS_RESP=$(curl -sf "$OLLAMA_HOST/api/tags" 2>/dev/null)
+    if echo "$MODELS_RESP" | jq -e '.models[] | select(.name | startswith("bge-m3"))' >/dev/null 2>&1; then
+        pass "bge-m3 model available in Ollama"
+    else
+        fail "bge-m3 model not found in Ollama (run: ollama pull bge-m3)"
+    fi
+}
+
+# ==============================================================================
 # MAIN
 # ==============================================================================
 MODE="${1:-full}"
@@ -1057,6 +1093,7 @@ case "$MODE" in
         do_verify
         do_prompt_quality_tests
         run_hallucination_tests
+        run_embedding_validation_tests
         ;;
     full)
         do_reset
@@ -1065,6 +1102,7 @@ case "$MODE" in
         do_verify
         do_prompt_quality_tests
         run_hallucination_tests
+        run_embedding_validation_tests
         ;;
     sync)
         do_sync_tests
@@ -1087,6 +1125,9 @@ case "$MODE" in
     large-pdf)
         do_large_pdf_tests
         ;;
+    embedding)
+        run_embedding_validation_tests
+        ;;
     all)
         do_reset
         do_ingest
@@ -1099,9 +1140,10 @@ case "$MODE" in
         do_hardening_tests
         do_ingestion_status_tests
         do_large_pdf_tests
+        run_embedding_validation_tests
         ;;
     *)
-        echo "Usage: $0 [reset|test|full|sync|audit|hardening|prompt|hallucination|ingestion-status|large-pdf|all]"
+        echo "Usage: $0 [reset|test|full|sync|audit|hardening|prompt|hallucination|ingestion-status|large-pdf|embedding|all]"
         exit 1
         ;;
 esac

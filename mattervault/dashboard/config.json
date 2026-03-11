@@ -74,7 +74,7 @@
       "name": "Qdrant",
       "type": "qdrant",
       "url": "http://mattermemory:6333",
-      "collection": "mattervault_documents_v2",
+      "collection": "mattervault_documents_v3",
       "interval": 30,
       "timeout": 5000
     },

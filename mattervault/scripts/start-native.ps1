@@ -76,6 +76,6 @@ if (-not $skipDocling) {
 }
 Write-Host ""
 Write-Host "Pull required models:"
-Write-Host "  ollama pull nomic-embed-text"
+Write-Host "  ollama pull bge-m3"
 Write-Host "  ollama pull llama3.1:8b"
 Write-Host "=============================================="
