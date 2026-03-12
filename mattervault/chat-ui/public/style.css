@@ -762,15 +762,15 @@ select option {
   background: rgba(0, 0, 0, 0.3);
   border: 1px solid var(--border-subtle);
   border-radius: 16px;
-  color: var(--text-secondary);
+  color: #d4a017;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .quick-actions-btn:hover:not(:disabled) {
-  border-color: var(--border-glow);
-  color: var(--accent-teal);
-  background: rgba(0, 212, 170, 0.1);
+  border-color: rgba(212, 160, 23, 0.4);
+  color: #f0b429;
+  background: rgba(212, 160, 23, 0.1);
 }
 
 .quick-actions-btn:disabled {

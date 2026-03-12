@@ -1292,21 +1292,14 @@
         card.classList.remove('disabled');
       });
       document.getElementById('quickActionsBtn').disabled = false;
-
-      // Clear welcome message if present
-      const welcome = messages.querySelector('.welcome-message');
-      if (welcome) {
-        welcome.remove();
-      }
-
-      // Add system message if starting fresh (no current conversation)
-      if (!currentConversationId) {
-        addMessage('system', `Now chatting about ${capitalizeFirst(selectedFamily.name)} family (${numDocs} ${docLabel}).`);
-      }
     }
 
     // Send message - dispatches to streaming or non-streaming mode
     async function sendMessage() {
+      // Clear welcome screen when first message is sent
+      const welcome = messages.querySelector('.welcome-message');
+      if (welcome) welcome.remove();
+
       if (useStreaming) {
         return sendStreamingMessage();
       }
