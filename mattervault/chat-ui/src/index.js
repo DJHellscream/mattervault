@@ -9,6 +9,7 @@ const conversationsRoutes = require('./routes/conversations');
 const { createDocumentsRouter } = require('./routes/documents');
 const { waitForDatabase, runMigrations } = require('./migrations');
 const { requireAuth } = require('./middleware/auth');
+const { cleanupExpiredSessions } = require('./auth');
 
 // Process-level error handlers — prevent silent crashes
 process.on('unhandledRejection', (reason, promise) => {
@@ -175,6 +176,11 @@ async function start() {
       console.log(`Paperless: ${config.paperless.url}`);
       console.log(`Qdrant: ${config.qdrant.url}`);
       console.log(`n8n Webhook: ${config.n8n.webhookUrl}`);
+
+      // Clean up expired sessions every 24 hours
+      setInterval(cleanupExpiredSessions, 24 * 60 * 60 * 1000);
+      // Also run once on startup (after a brief delay)
+      setTimeout(cleanupExpiredSessions, 10000);
     });
   } catch (err) {
     console.error('Failed to start server:', err);
