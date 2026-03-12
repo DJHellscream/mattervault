@@ -700,7 +700,7 @@ run_embedding_validation_tests() {
     header "EMBEDDING VALIDATION TESTS"
 
     # Check collection exists with correct dimensions
-    COLLECTION=$(curl -sf "http://mattermemory:6333/collections/mattervault_documents_v3" 2>/dev/null)
+    COLLECTION=$(curl -sf "http://mattermemory:6333/collections/mattervault_documents" 2>/dev/null)
     if [ $? -eq 0 ]; then
         pass "Qdrant collection v3 exists"
         DIM=$(echo "$COLLECTION" | jq '.result.config.params.vectors.size')
@@ -725,7 +725,7 @@ run_embedding_validation_tests() {
 
 **Step 2: Create v3 collection in init-qdrant.sh**
 
-Update to create `mattervault_documents_v3` with 1024 dimensions and BM25 sparse vectors.
+Update to create `mattervault_documents` with 1024 dimensions and BM25 sparse vectors.
 
 **Step 3: Update all workflows to use bge-m3**
 
@@ -737,7 +737,7 @@ Update to create `mattervault_documents_v3` with 1024 dimensions and BM25 sparse
 
 ```
 OLLAMA_EMBEDDING_MODEL=bge-m3
-QDRANT_COLLECTION=mattervault_documents_v3
+QDRANT_COLLECTION=mattervault_documents
 ```
 
 **Step 5: Re-index all documents**
