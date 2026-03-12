@@ -982,6 +982,49 @@ select option {
   padding: 0;
 }
 
+/* Headings in chat messages */
+.message-content .chat-heading {
+  font-family: 'Outfit', sans-serif;
+  font-weight: 600;
+  margin: 16px 0 8px 0;
+  color: var(--text-primary);
+  line-height: 1.3;
+}
+
+.message-content h2.chat-heading { font-size: 1.1rem; }
+.message-content h3.chat-heading { font-size: 1.0rem; }
+.message-content h4.chat-heading { font-size: 0.95rem; color: var(--text-secondary); }
+.message-content h5.chat-heading { font-size: 0.9rem; color: var(--text-secondary); }
+
+/* First heading shouldn't have top margin */
+.message-content .chat-heading:first-child {
+  margin-top: 0;
+}
+
+/* Lists in chat messages */
+.message-content ol {
+  margin: 6px 0;
+  padding-left: 24px;
+}
+
+.message-content ol li {
+  margin: 4px 0;
+  line-height: 1.5;
+}
+
+.message-content .bullet-item {
+  list-style: disc;
+  margin: 3px 0 3px 20px;
+  display: list-item;
+}
+
+/* Horizontal rules */
+.message-content hr {
+  border: none;
+  border-top: 1px solid var(--border-subtle);
+  margin: 12px 0;
+}
+
 /* Source citations */
 .source-citation {
   display: inline-block;

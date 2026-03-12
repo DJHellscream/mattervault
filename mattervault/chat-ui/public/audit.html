@@ -6,6 +6,11 @@
   <title>Audit Logs - Mattervault Admin</title>
   <link rel="stylesheet" href="/style.css">
   <style>
+    /* Override body overflow for audit page (chat page needs hidden) */
+    body {
+      overflow: auto;
+    }
+
     /* Page-specific layout */
     .audit-page {
       position: relative;
@@ -310,7 +315,7 @@
       font-size: 0.9rem;
       color: var(--text-primary);
       border-bottom: 1px solid rgba(100, 120, 160, 0.08);
-      vertical-align: top;
+      vertical-align: middle;
     }
 
     .logs-table tr:hover td {
@@ -330,9 +335,6 @@
     }
 
     .cell-user {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
     }
 
     .cell-user .username {

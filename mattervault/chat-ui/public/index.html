@@ -1515,9 +1515,15 @@
                     break;
 
                   case 'error':
-                    throw new Error(parsed.error);
+                    // Re-throw with marker so outer catch can display it
+                    const streamErr = new Error(parsed.error || 'Request failed');
+                    streamErr.isStreamError = true;
+                    throw streamErr;
                 }
               } catch (parseErr) {
+                if (parseErr.isStreamError) {
+                  throw parseErr; // Propagate stream errors to outer catch
+                }
                 if (parseErr.message !== 'Unexpected end of JSON input') {
                   console.error('Parse error:', parseErr, 'Data:', data);
                 }
@@ -1667,17 +1673,6 @@
     function formatMessage(text, citations = []) {
       if (!text) return '';
 
-      // Build citation lookup map from structured citations
-      const citationMap = new Map();
-      if (citations && Array.isArray(citations)) {
-        citations.forEach(c => {
-          if (c.document_id && c.source) {
-            // Map document title (or partial match) to document ID
-            citationMap.set(c.source.toLowerCase(), { docId: c.document_id, page: c.pages?.[0] || c.page });
-          }
-        });
-      }
-
       // Deduplicate sources in "Sources consulted" section
       text = deduplicateSources(text);
 
@@ -1687,71 +1682,95 @@
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;');
 
-      // Convert markdown-like syntax
-      formatted = formatted
+      // Convert markdown syntax to HTML
+      // Process block-level elements line by line, then inline formatting
+      const lines = formatted.split('\n');
+      const processedLines = [];
+      let inList = false;
+
+      for (let i = 0; i < lines.length; i++) {
+        let line = lines[i];
+
+        // Horizontal rules (--- or ***)
+        if (/^[\s]*[-*]{3,}[\s]*$/.test(line)) {
+          if (inList) { processedLines.push('</ol>'); inList = false; }
+          processedLines.push('<hr>');
+          continue;
+        }
+
+        // Headings (###, ##, #)
+        const headingMatch = line.match(/^(#{1,4})\s+(.+)$/);
+        if (headingMatch) {
+          if (inList) { processedLines.push('</ol>'); inList = false; }
+          const level = Math.min(headingMatch[1].length + 1, 6); // h2-h5 (avoid h1)
+          processedLines.push(`<h${level} class="chat-heading">${headingMatch[2]}</h${level}>`);
+          continue;
+        }
+
+        // Numbered list items (1. text, with optional indent)
+        const numberedMatch = line.match(/^(\s*)\d+\.\s+(.+)$/);
+        if (numberedMatch) {
+          if (!inList) { processedLines.push('<ol>'); inList = true; }
+          processedLines.push(`<li>${numberedMatch[2]}</li>`);
+          continue;
+        }
+
+        // Unordered list items (- text or * text)
+        const bulletMatch = line.match(/^(\s*)[-*]\s+(.+)$/);
+        if (bulletMatch) {
+          if (inList) { processedLines.push('</ol>'); inList = false; }
+          processedLines.push(`<li class="bullet-item">${bulletMatch[2]}</li>`);
+          continue;
+        }
+
+        // Regular line
+        if (inList) { processedLines.push('</ol>'); inList = false; }
+        if (line.trim() === '') {
+          processedLines.push('<br>');
+        } else {
+          processedLines.push(line + '<br>');
+        }
+      }
+      if (inList) processedLines.push('</ol>');
+
+      formatted = processedLines.join('\n')
         // Bold
         .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        // Italic
+        .replace(/\*([^*]+)\*/g, '<em>$1</em>')
         // Code blocks
         .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
         // Inline code
-        .replace(/`([^`]+)`/g, '<code>$1</code>')
-        // Line breaks
-        .replace(/\n/g, '<br>');
+        .replace(/`([^`]+)`/g, '<code>$1</code>');
 
-      // Make source citations clickable
-      // Format: (Source: filename.pdf, Page X) or (Source: filename.pdf (Page X))
-      // Extract document ID if embedded: [doc:123]filename.pdf or from citations map
+      // Make citations clickable using embedded [doc:ID] markers from n8n.
+      // n8n embeds [doc:ID] before document names in both inline citations and the
+      // Citations footer. This regex simply finds them and wraps in clickable links.
+      // First pass: extract page number from surrounding (Source: ..., Page N) context
       formatted = formatted.replace(
-        /\(Source: (?:\[doc:(\d+)\])?([^,)]+?)(?:,?\s*(?:\()?[Pp]age\s*(\d+)(?:\))?)?\)/g,
-        (match, embeddedDocId, filename, page) => {
-          const displayText = page ? `${filename}, Page ${page}` : filename;
-          // First check for embedded doc ID, then look up in citations map
-          let docId = embeddedDocId;
-          if (!docId && citationMap.size > 0) {
-            const key = filename.toLowerCase().trim();
-            const citation = citationMap.get(key);
-            if (citation) {
-              docId = citation.docId;
-            }
-          }
-          if (docId) {
-            // We have a document ID - make it clickable
-            return `<a href="#" class="source-citation clickable" onclick="previewDocument('${docId}', ${page || 1}); return false;" title="Click to view document">(Source: ${displayText})</a>`;
-          }
-          // No doc ID - just display as non-clickable citation
-          return `<span class="source-citation">(Source: ${displayText})</span>`;
+        /\(Source:\s*\[doc:(\d+)\]([^,)]+),?\s*[Pp]ages?\s*([\d–-]+)\)/g,
+        (match, docId, title, pages) => {
+          const page = parseInt(pages) || 1;
+          return `<a href="#" class="source-citation clickable" onclick="previewDocument('${docId}', ${page}); return false;" title="Click to view document">(Source: ${title.trim()}, Page ${pages})</a>`;
         }
       );
 
-      // Handle numbered source format: (Source X: Page Y) or (Source X: filename, Page Y)
+      // Second pass: remaining [doc:ID] markers (citation list items, inline without page)
       formatted = formatted.replace(
-        /\(Source (\d+): (?:\[doc:(\d+)\])?([^)]+)\)/g,
-        (match, sourceNum, docId, details) => {
-          if (docId) {
-            // Extract page number if present
-            const pageMatch = details.match(/[Pp]age\s*(\d+)/);
-            const page = pageMatch ? pageMatch[1] : 1;
-            return `<a href="#" class="source-citation clickable" onclick="previewDocument('${docId}', ${page}); return false;" title="Click to view document">(Source ${sourceNum}: ${details})</a>`;
-          }
-          return `<span class="source-citation">(Source ${sourceNum}: ${details})</span>`;
+        /\[doc:(\d+)\]([^\[<]+)/g,
+        (match, docId, title) => {
+          return `<a href="#" class="source-citation clickable" onclick="previewDocument('${docId}', 1); return false;" title="Click to view document">${title.trim()}</a>`;
         }
       );
 
-      // Make "Sources consulted" list items clickable using citation map
-      if (citationMap.size > 0) {
-        formatted = formatted.replace(
-          /- ([^,<]+?)(?:, Page (\d+))?(<br>|$)/g,
-          (match, title, page, ending) => {
-            const key = title.toLowerCase().trim();
-            const citation = citationMap.get(key);
-            if (citation) {
-              const displayPage = page || citation.page || 1;
-              return `- <a href="#" class="source-citation clickable" onclick="previewDocument('${citation.docId}', ${displayPage}); return false;" title="Click to view document">${title}${page ? ', Page ' + page : ''}</a>${ending}`;
-            }
-            return match;
-          }
-        );
-      }
+      // Style any remaining (Source: ...) that don't have doc IDs
+      formatted = formatted.replace(
+        /\(Source:\s*([^)]+)\)/g,
+        (match, content) => {
+          if (match.includes('source-citation')) return match;
+          return `<span class="source-citation">(Source: ${content})</span>`;
+        }
+      );
 
       return formatted;
     }

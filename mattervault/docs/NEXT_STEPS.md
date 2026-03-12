@@ -39,24 +39,17 @@
 - Reconciliation sequential fetch fix (prevents race condition with parallel HTTP calls)
 - System prompt tuned for exhaustive responses (lists all items, not just highlights)
 - Docling poll interval reduced from 5s to 2s
+- **Prompt Library (Quick Actions)**: welcome screen cards + input area lightning bolt menu, 5 default prompts, admin management page with drag-to-reorder and icon picker, database-backed CRUD API
+- **bge-m3 NaN embedding fix**: Embed Question node retries with text modifications when Ollama produces NaN (token pattern bug workaround)
+- **Chat markdown rendering**: formatMessage renders headings, lists, horizontal rules, bold/italic properly
+- **SSE error propagation**: stream errors now show "Streaming failed: ..." instead of empty bubbles
+- **Chat UI polish**: dropdown option dark theme styling, audit page scroll fix, audit table vertical alignment
 
 ---
 
 ## Potential Next Steps
 
 ### Features
-
-**Prompt Library (Quick Actions)** *(Priority: Medium)*
-- Problem: Junior associates ask inconsistent questions, get inconsistent results
-- Solution: Dropdown in Chat UI with pre-built "Quick Actions" that standardize queries
-- Example actions:
-  - "Summarize Key Terms" → Structured summary of document provisions
-  - "Find Risk Clauses" → Identify indemnification, liability, termination clauses
-  - "Draft Statutory Summary" → Extract statutory references with citations
-  - "Compare to Template" → Highlight deviations from standard language
-- Implementation: Chat UI dropdown + prompt templates stored in config
-- Benefit: Consistent output quality, training aid for new staff
-- Effort: 3-4 hours (Chat UI + prompt engineering)
 
 **Metadata Filtering** *(Priority: Medium)*
 - Problem: Can only filter by `family_id`, but lawyers want to filter by date range, document type, correspondent
@@ -98,10 +91,6 @@
 - Format citations for court filings (Bluebook, local court rules)
 - Export answers with properly formatted legal citations
 
-**Saved Query Templates** *(Priority: Future)*
-- Firm-wide library of reusable queries
-- Share effective prompts across the organization
-
 ### Operations
 
 **Production Hardening** *(Priority: Medium — required before network exposure)*
@@ -116,10 +105,9 @@
 
 | Task | Effort | Impact | Priority |
 |------|--------|--------|----------|
-| Prompt Library | Medium | High | Best next feature |
 | Cross-encoder reranking | Medium | High | Best quality improvement |
-| Metadata filtering | Medium | Medium | Nice to have |
 | Production hardening | Medium | High | Before network go-live |
+| Metadata filtering | Medium | Medium | Nice to have |
 | Contextual chunking | Medium | Medium | After real-world testing |
 | Per-family access | High | Medium | When needed |
 | Visual Intelligence | High | Medium | Future |
