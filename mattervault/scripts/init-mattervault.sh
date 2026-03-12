@@ -141,6 +141,7 @@ WORKFLOWS=(
     "document-reconciliation.json"
     "audit-partition-maintenance.json"
     "audit-archive.json"
+    "system-alerts.json"
 )
 
 WORKFLOW_IDS=()
@@ -209,20 +210,23 @@ else
     pass "Authenticated with Paperless"
 
     info "Creating ingestion status tags..."
-    for tag_name in "processing" "ai_ready" "ingestion_error"; do
+    for tag_name in "intake" "processing" "ai_ready" "ingestion_error"; do
         EXISTING=$(curl -sf "$PAPERLESS_URL/api/tags/?name__iexact=$tag_name" \
             -H "Authorization: Token $TOKEN" 2>/dev/null | grep -o '"count":[0-9]*' | cut -d: -f2)
         if [ "${EXISTING:-0}" -gt 0 ]; then
             pass "Tag '$tag_name' already exists"
         else
             COLOR="#808080"
+            [ "$tag_name" = "intake" ] && COLOR="#17A2B8"
             [ "$tag_name" = "processing" ] && COLOR="#FFA500"
             [ "$tag_name" = "ai_ready" ] && COLOR="#28A745"
             [ "$tag_name" = "ingestion_error" ] && COLOR="#DC3545"
+            IS_INBOX="false"
+            [ "$tag_name" = "intake" ] && IS_INBOX="true"
             curl -sf -X POST "$PAPERLESS_URL/api/tags/" \
                 -H "Authorization: Token $TOKEN" \
                 -H "Content-Type: application/json" \
-                -d "{\"name\":\"$tag_name\",\"color\":\"$COLOR\",\"is_inbox_tag\":false}" >/dev/null 2>&1 \
+                -d "{\"name\":\"$tag_name\",\"color\":\"$COLOR\",\"is_inbox_tag\":$IS_INBOX}" >/dev/null 2>&1 \
                 && pass "Created tag '$tag_name'" || warn "Failed to create tag '$tag_name'"
         fi
     done
@@ -320,9 +324,10 @@ echo "  - Dashboard:  http://localhost:3006"
 echo ""
 echo "Next steps:"
 echo "  1. Login to Paperless (admin / $PAPERLESS_PASS)"
-echo "  2. Create intake folders for your families (e.g., ./intake/smith/)"
-echo "  3. Configure Paperless consumer to watch intake folders"
+echo "  2. Create a tag in Paperless for each family (e.g., 'smith', 'jones')"
+echo "  3. Create matching intake folders: mkdir -p ./intake/smith ./intake/jones"
 echo "  4. Drop PDFs into intake folders to start ingesting"
+echo "     (pre-consume validation requires a matching tag to exist)"
 echo ""
 echo "To verify n8n workflows are active:"
 echo "  docker exec $N8N_CONTAINER n8n list:workflow --active=true"
