@@ -275,11 +275,11 @@
     },
     {
       "parameters": {
-        "amount": 5,
+        "amount": 2,
         "unit": "seconds"
       },
       "id": "wait-poll",
-      "name": "Wait 5s",
+      "name": "Wait 2s",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
       "position": [
@@ -678,7 +678,7 @@
         ],
         [
           {
-            "node": "Wait 5s",
+            "node": "Wait 2s",
             "type": "main",
             "index": 0
           }
@@ -690,17 +690,6 @@
         [
           {
             "node": "Process Docling Chunks",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Wait 5s": {
-      "main": [
-        [
-          {
-            "node": "Check Conversion Status",
             "type": "main",
             "index": 0
           }
@@ -795,7 +784,7 @@
       "main": [
         [
           {
-            "node": "Wait 5s",
+            "node": "Wait 2s",
             "type": "main",
             "index": 0
           }
@@ -840,6 +829,17 @@
         [
           {
             "node": "Tag: AI Ready",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 2s": {
+      "main": [
+        [
+          {
+            "node": "Check Conversion Status",
             "type": "main",
             "index": 0
           }

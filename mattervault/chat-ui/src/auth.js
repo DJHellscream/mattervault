@@ -16,7 +16,7 @@ const REFRESH_TOKEN_EXPIRY_DAYS = 30;        // Refresh token valid for 30 days
 const PAPERLESS_URL = process.env.PAPERLESS_URL || 'http://mattervault:8000';
 
 // System tags to exclude when fetching families
-const SYSTEM_TAGS = ['inbox', 'intake', 'processed', 'error', 'pending'];
+const SYSTEM_TAGS = ['inbox', 'intake', 'processed', 'processing', 'error', 'pending', 'ai_ready', 'ingestion_error'];
 
 // Redis client for session caching (uses database 1 to avoid Paperless collisions)
 const redis = new Redis(process.env.REDIS_URL || 'redis://mattercache:6379/1');

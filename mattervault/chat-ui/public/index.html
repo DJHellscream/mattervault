@@ -982,8 +982,10 @@
         </div>
       `;
 
-      // Unlock family selector for new chat
+      // Unlock family selector and reset to "Select a family"
       unlockFamilySelector();
+      familySelect.value = '';
+      onFamilyChange();
 
       renderConversationList();
       updateExportVisibility();
