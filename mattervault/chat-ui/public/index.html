@@ -563,6 +563,12 @@
               </svg>
               <span>Audit Logs</span>
             </a>
+            <a href="/prompts" class="admin-link" id="promptsLink">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+              </svg>
+              <span>Prompt Library</span>
+            </a>
             <button class="logout-btn" id="logoutBtn">Logout</button>
           </div>
         </div>
@@ -944,6 +950,10 @@
         const adminLink = document.getElementById('adminLink');
         if (adminLink && currentUser.role === 'admin') {
           adminLink.classList.add('visible');
+        }
+        const promptsLink = document.getElementById('promptsLink');
+        if (promptsLink && currentUser.role === 'admin') {
+          promptsLink.classList.add('visible');
         }
       }
     }

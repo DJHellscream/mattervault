@@ -80,6 +80,11 @@ app.get('/audit', (req, res) => {
   res.sendFile(path.join(__dirname, '../public/audit.html'));
 });
 
+// Serve prompts admin page (auth check happens client-side)
+app.get('/prompts', (req, res) => {
+  res.sendFile(path.join(__dirname, '../public/prompts.html'));
+});
+
 // Registration is disabled - users authenticate via Paperless
 // Redirect old register links to login
 app.get('/register.html', (req, res) => {
