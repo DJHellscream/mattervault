@@ -1565,7 +1565,7 @@
         citations.forEach(c => {
           if (c.document_id && c.source) {
             // Map document title (or partial match) to document ID
-            citationMap.set(c.source.toLowerCase(), { docId: c.document_id, page: c.page });
+            citationMap.set(c.source.toLowerCase(), { docId: c.document_id, page: c.pages?.[0] || c.page });
           }
         });
       }

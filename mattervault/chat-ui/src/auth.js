@@ -91,28 +91,42 @@ async function fetchPaperlessUser(token) {
  * @returns {Promise<Array>} Array of family tags with document counts
  */
 async function fetchUserFamilies(token) {
+  const QDRANT_URL = process.env.QDRANT_URL || 'http://mattermemory:6333';
+  const QDRANT_COLLECTION = process.env.QDRANT_COLLECTION || 'mattervault_documents';
+
   try {
-    const response = await fetch(`${PAPERLESS_URL}/api/tags/`, {
-      headers: { 'Authorization': `Token ${token}` }
+    // Query Qdrant for actual family_id values — this is the source of truth
+    const qdrantRes = await fetch(`${QDRANT_URL}/collections/${QDRANT_COLLECTION}/points/scroll`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ limit: 10000, with_payload: ['family_id'], with_vector: false })
     });
 
-    if (!response.ok) {
-      console.error('Failed to fetch tags:', response.status);
+    if (!qdrantRes.ok) {
+      console.error('Failed to fetch Qdrant families:', qdrantRes.status);
       return [];
     }
 
-    const data = await response.json();
-    const results = data.results || data;
+    const qdrantData = await qdrantRes.json();
+    const points = qdrantData.result?.points || [];
 
-    // Filter out system tags, return family tags with document counts
-    return results
-      .filter(tag => !SYSTEM_TAGS.includes(tag.slug?.toLowerCase()))
-      .map(tag => ({
-        id: tag.id,
-        name: tag.name,
-        slug: tag.slug,
-        document_count: tag.document_count || 0
-      }));
+    // Count documents per family_id
+    const familyCounts = {};
+    const docsByFamily = {};
+    for (const p of points) {
+      const fid = p.payload?.family_id;
+      if (!fid) continue;
+      if (!docsByFamily[fid]) docsByFamily[fid] = new Set();
+      docsByFamily[fid].add(p.payload?.document_id);
+      familyCounts[fid] = (familyCounts[fid] || 0) + 1;
+    }
+
+    return Object.keys(docsByFamily).sort().map(fid => ({
+      id: fid,
+      name: fid,
+      slug: fid,
+      document_count: docsByFamily[fid].size
+    }));
   } catch (err) {
     console.error('Error fetching families:', err.message);
     return [];
