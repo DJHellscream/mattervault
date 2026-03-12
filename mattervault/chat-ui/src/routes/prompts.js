@@ -7,6 +7,8 @@ const express = require('express');
 const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 const router = express.Router();
 
 /**
@@ -83,6 +85,9 @@ router.post('/', requireAuth, requireAdmin, async (req, res) => {
 router.put('/:id', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
+    if (!UUID_REGEX.test(id)) {
+      return res.status(400).json({ error: 'Invalid prompt ID format', code: 'VALIDATION_ERROR' });
+    }
     const { title, description, icon, prompt_text, enabled } = req.body;
     if (!title || !prompt_text) {
       return res.status(400).json({
@@ -118,6 +123,9 @@ router.put('/:id', requireAuth, requireAdmin, async (req, res) => {
 router.delete('/:id', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
+    if (!UUID_REGEX.test(id)) {
+      return res.status(400).json({ error: 'Invalid prompt ID format', code: 'VALIDATION_ERROR' });
+    }
     const check = await db.query(
       'SELECT is_default FROM prompt_templates WHERE id = $1',
       [id]
@@ -157,6 +165,14 @@ router.patch('/reorder', requireAuth, requireAdmin, async (req, res) => {
         error: 'Order array is required',
         code: 'VALIDATION_ERROR'
       });
+    }
+    for (const item of order) {
+      if (!item.id || !UUID_REGEX.test(item.id) || typeof item.sort_order !== 'number') {
+        return res.status(400).json({
+          error: 'Each item must have a valid UUID id and numeric sort_order',
+          code: 'VALIDATION_ERROR'
+        });
+      }
     }
     await db.query('BEGIN');
     for (const item of order) {
