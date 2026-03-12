@@ -1,6 +1,6 @@
 # MatterVault - Potential Next Steps
 
-*Updated 2026-03-11*
+*Updated 2026-03-12*
 
 ## Recently Completed
 - Chat workflow with conversation persistence + audit logging
@@ -25,41 +25,24 @@
 - Pre-consume validation script (rejects docs from unrecognized intake folders)
 - Family_id mismatch detection + auto-correction in reconciliation workflow
 - Dashboard "Reconcile Now" button (manual trigger for reconciliation)
+- Ingestion status tags: `intake` → `processing` → `ai_ready` / `ingestion_error`
+- Large PDF support: 10-min Docling timeout + `scripts/split-pdf.py` for 200+ page docs
+- Hallucination testing: adversarial test suite + system prompt hardening
+- Embeddings upgrade: nomic-embed-text (768d) → BGE-M3 (1024d), Qdrant collection v3
+- Process error handlers (`unhandledRejection` + `uncaughtException` in Chat-UI)
+- Docker health checks + resource limits on all services
+- Session cleanup: `cleanupExpiredSessions()` runs on startup + every 24 hours
+- Deployment hardening: `.env` untracked, `.gitignore`, `.env.example` template
+- Audio ingestion via Docling Whisper ASR (WAV, MP3, M4A)
+- Dynamic family dropdown (queries Qdrant for families with actual vectors)
+- Citation fuzzy matching (handles filename normalization, clean titles in context)
+- Reconciliation sequential fetch fix (prevents race condition with parallel HTTP calls)
+- System prompt tuned for exhaustive responses (lists all items, not just highlights)
+- Docling poll interval reduced from 5s to 2s
 
 ---
 
 ## Potential Next Steps
-
-### Reliability & Operations
-
-**Ingestion Status Visibility** *(Priority: High)*
-- Problem: Paralegals drop files into `/intake/<family>/` but have no visibility into processing status
-- Solution: Use Paperless tags to show pipeline status
-- Tag flow: `intake` → `processing` → `ai_ready` (or `error`)
-- Implementation:
-  1. n8n adds `processing` tag when ingestion starts
-  2. On success: add `ai_ready`, remove `processing`
-  3. On failure: add `error`, remove `processing`
-- Paralegals filter by tag in Paperless to see stuck documents
-- Effort: 2-3 hours (n8n workflow changes only)
-
-**Large PDF Chunking** *(Priority: High)*
-- Problem: Docling times out on PDFs >50 pages (discovery docs are often 200+ pages)
-- Solution: Pre-ingest chunking in n8n before sending to Docling
-- Implementation:
-  1. Check page count before Docling call
-  2. If >25 pages: split into 25-page chunks using PyPDF2
-  3. Process each chunk through Docling separately
-  4. Track `page_offset` so page numbers stay accurate in Qdrant
-  5. Recombine chunks before embedding
-- Effort: 4-6 hours (Python script + n8n workflow changes)
-
-**Hallucination Testing** *(Priority: High)*
-- Problem: Unknown how system responds when answer doesn't exist in documents
-- Test: Send adversarial queries (e.g., "What is the liability cap?" when none exists)
-- Expected: System should say "I don't find that information" not fabricate an answer
-- May require system prompt tuning in n8n chat workflow
-- Effort: 1-2 hours (testing + prompt adjustments)
 
 ### Features
 
@@ -87,42 +70,7 @@
 - More relevant as user base grows
 - Effort: High
 
-### Future Vision
-
-**Visual Intelligence** *(Priority: Future)*
-- Problem: Charts, graphs, and tables in PDFs are not searchable as text
-- Solution: Integrate Llama 3.2 Vision to analyze visual elements detected by Docling
-- Implementation:
-  1. Docling detects images/charts/tables in PDF
-  2. Pass visual elements to Llama 3.2 Vision
-  3. Generate descriptive text (e.g., "Bar chart showing revenue growth from $1M to $5M, 2020-2024")
-  4. Index descriptions in Qdrant alongside document text
-- Benefit: "What was the revenue trend?" becomes answerable even from charts
-- Effort: High (new model integration, pipeline changes)
-- Dependencies: Llama 3.2 Vision availability in Ollama
-
-**Citation Export** *(Priority: Future)*
-- Format citations for court filings (Bluebook, local court rules)
-- Export answers with properly formatted legal citations
-
-**Saved Query Templates** *(Priority: Future)*
-- Firm-wide library of reusable queries
-- Share effective prompts across the organization
-
-### AI Quality Upgrades (from 2026-02-24 evaluation)
-
-**Upgrade Embeddings to BGE-M3** *(Priority: High)*
-- Problem: nomic-embed-text (768d) is outperformed by BGE-M3 (1024d) on MTEB benchmarks
-- BGE-M3 also provides native sparse+dense vectors from one model (can replace hashCode BM25 tokenizer)
-- 8192 token context vs nomic's 2048 — handles longer chunks without truncation
-- Implementation:
-  1. `ollama pull bge-m3`
-  2. Create new Qdrant collection `mattervault_documents` with 1024 dimensions
-  3. Update n8n ingestion workflow to use `bge-m3`
-  4. Re-ingest all documents (maintenance window)
-  5. Switch chat workflow to query new collection
-- Effort: 4-6 hours (requires full re-index)
-- Risk: Medium (breaking change, needs validation)
+### AI Quality Upgrades
 
 **Add Cross-Encoder Reranking** *(Priority: Medium)*
 - Problem: Current LLM-based reranking (qwen3:8b scoring 0-10) is slow and less accurate than dedicated rerankers
@@ -138,35 +86,29 @@
 - Cost: One additional LLM call per chunk during ingestion
 - Effort: 3-4 hours
 
-### Code Quality (from 2026-02-24 evaluation)
+### Future Vision
 
-**Add Process Error Handlers** *(Priority: High)*
-- Chat-UI missing `process.on('unhandledRejection')` and `process.on('uncaughtException')`
-- Could cause silent crashes in production
-- Effort: 30 minutes
+**Visual Intelligence** *(Priority: Future)*
+- Problem: Charts, graphs, and tables in PDFs are not searchable as text
+- Solution: Integrate Llama 3.2 Vision to analyze visual elements detected by Docling
+- Benefit: "What was the revenue trend?" becomes answerable even from charts
+- Effort: High (new model integration, pipeline changes)
 
-**Call cleanupExpiredSessions()** *(Priority: Medium)*
-- Function exported in auth.js but never called — sessions accumulate indefinitely
-- Add a setInterval or node-cron schedule to clean up expired sessions
-- Effort: 30 minutes
+**Citation Export** *(Priority: Future)*
+- Format citations for court filings (Bluebook, local court rules)
+- Export answers with properly formatted legal citations
 
-**Make Dashboard Families Dynamic** *(Priority: Medium)*
-- Dashboard metricsCollector.js hardcodes `['morrison', 'johnson']` for family distribution
-- Should query Qdrant for actual family_id values dynamically
-- Effort: 1 hour
-
-**Docker Health Checks + Resource Limits** *(Priority: Medium)*
-- No Docker healthcheck directives — Docker can't detect or auto-restart failed services
-- No CPU/memory limits — one runaway OCR job could crash the entire stack
-- Effort: 2 hours
+**Saved Query Templates** *(Priority: Future)*
+- Firm-wide library of reusable queries
+- Share effective prompts across the organization
 
 ### Operations
 
-**Production Hardening** *(Priority: Medium)*
+**Production Hardening** *(Priority: Medium — required before network exposure)*
 - HTTPS/TLS termination (nginx or traefik)
 - Proper secrets management (not .env files)
 - Rate limiting on chat API
-- Effort: Medium
+- Effort: 4-6 hours
 
 ---
 
@@ -174,20 +116,12 @@
 
 | Task | Effort | Impact | Priority |
 |------|--------|--------|----------|
-| Ingestion status tags | Low | High | Do first |
-| Large PDF chunking | Medium | High | Do second |
-| Hallucination testing | Low | High | Do third |
-| Upgrade embeddings (BGE-M3) | Medium | High | After reliability |
-| Cross-encoder reranking | Medium | High | After embeddings |
-| Prompt Library | Medium | High | After core reliability |
-| Process error handlers | Low | Medium | Quick win |
-| Session cleanup | Low | Low | Quick win |
-| Dynamic dashboard families | Low | Low | Quick win |
-| Docker health checks | Low | Medium | Before go-live |
+| Prompt Library | Medium | High | Best next feature |
+| Cross-encoder reranking | Medium | High | Best quality improvement |
 | Metadata filtering | Medium | Medium | Nice to have |
+| Production hardening | Medium | High | Before network go-live |
+| Contextual chunking | Medium | Medium | After real-world testing |
 | Per-family access | High | Medium | When needed |
-| Contextual chunking | Medium | Medium | After BGE-M3 |
-| Production hardening | Medium | High | Before go-live |
 | Visual Intelligence | High | Medium | Future |
 | Citation export | Medium | Medium | Future |
 

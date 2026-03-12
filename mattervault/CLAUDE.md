@@ -76,6 +76,11 @@ PDF/Audio dropped in ./intake/<family>/
 
 **Audio Support**: Voice memos and audio recordings (WAV, MP3, M4A) are transcribed via Docling's Whisper ASR integration before embedding. Requires Docling to be started with ASR support: `docling-serve --host 0.0.0.0 --port 5001 --no-ui --asr`
 
+**Ingestion Status Tags**: Documents are tagged through the pipeline for visibility:
+- `intake` → `processing` (ingestion starts) → `ai_ready` (success) or `ingestion_error` (failure)
+- `intake` and `processing` tags are removed on success
+- Paralegals can filter by tag in Paperless to see stuck documents
+
 ### Chat Query Flow
 
 ```
@@ -274,6 +279,7 @@ SELECT * FROM sync.reconciliation_log WHERE created_at > NOW() - INTERVAL '1 day
 | Audit Partition Maintenance | `SPDqGNXbYC6J4aKX` | Monthly partition creation |
 | Audit Archive (7-Year Retention) | `GkM7qDYrqrAQeAyv` | Archive old data |
 | Document Reconciliation (Sync) | `qmC66Y7q2qYPOfN6` | Scheduled sync + delete detection |
+| System Alerts (Email) | `UWdvsIE47cPS6G0l` | Alert notifications via SMTP |
 
 ### Workflow Files
 
@@ -514,6 +520,7 @@ docker exec mattertest /e2e/test.sh all
 - New deployments: `cp .env.example .env` then edit values
 - SQL injection protection via parameterized queries + escaping
 - JWT tokens with Redis session validation
+- Expired sessions cleaned up automatically (every 24 hours + on startup)
 
 ## 15. Known Issues
 
