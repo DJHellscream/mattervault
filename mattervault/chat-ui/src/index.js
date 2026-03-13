@@ -25,6 +25,10 @@ process.on('uncaughtException', (error) => {
 });
 
 const app = express();
+
+// Trust first proxy (Caddy) for correct client IP in X-Forwarded-For
+app.set('trust proxy', 1);
+
 const PORT = process.env.PORT || 3000;
 
 // Configuration from environment
