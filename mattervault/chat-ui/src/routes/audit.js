@@ -193,11 +193,33 @@ router.get('/export', requireAuth, requireAdmin, async (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename="audit-export-${start_date}-to-${end_date}.jsonl"`);
     res.setHeader('X-Accel-Buffering', 'no');
 
-    // Execute query and stream results
-    const { rows } = await db.query(query, params);
+    // Stream results using a PostgreSQL cursor to avoid loading all rows into memory.
+    // This is critical for large date ranges (up to 1 year of audit logs).
+    const BATCH_SIZE = 500;
+    const cursorName = 'audit_export_cursor';
+    const client = await db.getClient();
+    try {
+      await client.query('BEGIN');
+      await client.query(`DECLARE ${cursorName} CURSOR FOR ${query}`, params);
 
-    for (const row of rows) {
-      res.write(JSON.stringify(row) + '\n');
+      let batch;
+      do {
+        batch = await client.query(`FETCH ${BATCH_SIZE} FROM ${cursorName}`);
+        for (const row of batch.rows) {
+          res.write(JSON.stringify(row) + '\n');
+        }
+      } while (batch.rows.length > 0);
+
+      await client.query(`CLOSE ${cursorName}`);
+      await client.query('COMMIT');
+    } catch (cursorErr) {
+      // Attempt to clean up the cursor and transaction on error
+      try {
+        await client.query('ROLLBACK');
+      } catch (_) { /* ignore rollback errors */ }
+      throw cursorErr;
+    } finally {
+      client.release();
     }
 
     res.end();
@@ -209,6 +231,9 @@ router.get('/export', requireAuth, requireAdmin, async (req, res) => {
         error: 'Export failed',
         code: 'SERVER_ERROR'
       });
+    } else {
+      // Headers already sent (partial stream); destroy the response to signal error
+      res.destroy();
     }
   }
 });

@@ -174,17 +174,24 @@ router.patch('/reorder', requireAuth, requireAdmin, async (req, res) => {
         });
       }
     }
-    await db.query('BEGIN');
-    for (const item of order) {
-      await db.query(
-        'UPDATE prompt_templates SET sort_order = $1, updated_at = NOW() WHERE id = $2',
-        [item.sort_order, item.id]
-      );
+    const client = await db.getClient();
+    try {
+      await client.query('BEGIN');
+      for (const item of order) {
+        await client.query(
+          'UPDATE prompt_templates SET sort_order = $1, updated_at = NOW() WHERE id = $2',
+          [item.sort_order, item.id]
+        );
+      }
+      await client.query('COMMIT');
+      res.json({ message: 'Order updated' });
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
     }
-    await db.query('COMMIT');
-    res.json({ message: 'Order updated' });
   } catch (err) {
-    await db.query('ROLLBACK');
     console.error('Reorder prompts error:', err);
     res.status(500).json({
       error: 'Failed to reorder prompts',

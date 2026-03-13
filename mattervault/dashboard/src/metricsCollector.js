@@ -103,28 +103,36 @@ class MetricsCollector {
   async getQdrantFamilyCounts(url, collection) {
     const counts = {};
 
-    // Step 1: Discover unique family_ids by scrolling points
+    // Step 1: Discover unique family_ids by paginating through all points
     try {
-      const scrollResponse = await fetch(`${url}/collections/${collection}/points/scroll`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          limit: 500,
+      const familyIds = new Set();
+      let nextPageOffset = null;
+      do {
+        const body = {
+          limit: 1000,
           with_payload: { include: ['family_id'] },
           with_vector: false
-        })
-      });
+        };
+        if (nextPageOffset) body.offset = nextPageOffset;
 
-      if (!scrollResponse.ok) return counts;
+        const scrollResponse = await fetch(`${url}/collections/${collection}/points/scroll`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
 
-      const scrollData = await scrollResponse.json();
-      const points = scrollData.result?.points || [];
-      const familyIds = new Set();
-      for (const point of points) {
-        if (point.payload?.family_id) {
-          familyIds.add(point.payload.family_id);
+        if (!scrollResponse.ok) break;
+
+        const scrollData = await scrollResponse.json();
+        const points = scrollData.result?.points || [];
+        for (const point of points) {
+          if (point.payload?.family_id) {
+            familyIds.add(point.payload.family_id);
+          }
         }
-      }
+
+        nextPageOffset = scrollData.result?.next_page_offset || null;
+      } while (nextPageOffset);
 
       // Step 2: Count each discovered family
       for (const family of familyIds) {

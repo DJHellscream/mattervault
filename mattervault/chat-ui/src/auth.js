@@ -96,30 +96,40 @@ async function fetchUserFamilies(token) {
 
   try {
     // Query Qdrant for actual family_id values — this is the source of truth
-    const qdrantRes = await fetch(`${QDRANT_URL}/collections/${QDRANT_COLLECTION}/points/scroll`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ limit: 10000, with_payload: ['family_id'], with_vector: false })
-    });
-
-    if (!qdrantRes.ok) {
-      console.error('Failed to fetch Qdrant families:', qdrantRes.status);
-      return [];
-    }
-
-    const qdrantData = await qdrantRes.json();
-    const points = qdrantData.result?.points || [];
-
-    // Count documents per family_id
-    const familyCounts = {};
+    // Paginate through all points to discover every family_id
     const docsByFamily = {};
-    for (const p of points) {
-      const fid = p.payload?.family_id;
-      if (!fid) continue;
-      if (!docsByFamily[fid]) docsByFamily[fid] = new Set();
-      docsByFamily[fid].add(p.payload?.document_id);
-      familyCounts[fid] = (familyCounts[fid] || 0) + 1;
-    }
+    let nextPageOffset = null;
+    do {
+      const body = {
+        limit: 1000,
+        with_payload: ['family_id', 'document_id'],
+        with_vector: false
+      };
+      if (nextPageOffset) body.offset = nextPageOffset;
+
+      const qdrantRes = await fetch(`${QDRANT_URL}/collections/${QDRANT_COLLECTION}/points/scroll`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+
+      if (!qdrantRes.ok) {
+        console.error('Failed to fetch Qdrant families:', qdrantRes.status);
+        break;
+      }
+
+      const qdrantData = await qdrantRes.json();
+      const points = qdrantData.result?.points || [];
+
+      for (const p of points) {
+        const fid = p.payload?.family_id;
+        if (!fid) continue;
+        if (!docsByFamily[fid]) docsByFamily[fid] = new Set();
+        docsByFamily[fid].add(p.payload?.document_id);
+      }
+
+      nextPageOffset = qdrantData.result?.next_page_offset || null;
+    } while (nextPageOffset);
 
     return Object.keys(docsByFamily).sort().map(fid => ({
       id: fid,
