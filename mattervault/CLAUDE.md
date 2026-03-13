@@ -97,7 +97,7 @@ User Question (Chat-UI)
 │  5. Generate BM25 Sparse Vector (hashCode tokenizer)                  │
 │  6. Hybrid Search (Qdrant RRF fusion, filtered by family_id)          │
 │  7. Keyword Pre-Filter (boost exact matches)                          │
-│  8. LLM Reranker (qwen3:8b scores 0-10)                                 │
+│  8. Cross-Encoder Reranker (Qwen3-Reranker-8B scores 0-10)               │
 │  9. Build Prompt (top results + chat history)                         │
 │ 10. Generate Answer (qwen3:8b)                                           │
 │ 11. Extract Citations                                                  │
@@ -151,7 +151,7 @@ The trust was executed on March 15, 2024 [Morrison Trust 2024, p.4]
 
 ### Access Model
 
-**Open access**: Any authenticated Paperless user can query any family's documents. Family is selected per-conversation via dropdown. This is appropriate for small, trusted teams.
+**Per-family access control (ethical walls)**: Admins see all families. Regular users only see families assigned to them via the admin API (`/api/admin/family-access`). Family is selected per-conversation via dropdown. Access is enforced at the API layer (family dropdown, chat endpoints, conversation creation). Users with no assigned families see an empty dropdown.
 
 ## 5. Multi-Tenancy (Family Isolation)
 
@@ -316,7 +316,7 @@ docker restart matterlogic
 |---------|-------|-------------|------------|
 | Embeddings | `bge-m3` | `OLLAMA_EMBEDDING_MODEL` | 1024 |
 | Chat/Generation | `qwen3:8b` | `OLLAMA_CHAT_MODEL` | - |
-| Reranking | `qwen3:8b` | `OLLAMA_RERANKER_MODEL` | - |
+| Reranking | `dengcao/Qwen3-Reranker-8B:Q8_0` | `OLLAMA_RERANKER_MODEL` | - |
 
 ## 10. File Structure
 
@@ -419,7 +419,7 @@ All configuration lives in `.env`. New deployment = `cp .env.example .env` + edi
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `MATTERVAULT_DATA_DIR` | `.` | Base path for all volume mounts (Windows: `D:\CCC\mattervault`) |
-| `OLLAMA_CHAT_MODEL` | `qwen3:8b` | LLM for chat and reranking |
+| `OLLAMA_CHAT_MODEL` | `qwen3:8b` | LLM for chat generation |
 | `OLLAMA_EMBEDDING_MODEL` | `bge-m3` | Embedding model |
 | `OLLAMA_URL` | `http://host.docker.internal:11434` | Ollama API endpoint |
 | `DOCLING_URL` | `http://host.docker.internal:5001` | Docling API endpoint |
@@ -447,6 +447,7 @@ cp .env.example .env
 # 3. Pull AI models
 ollama pull qwen3:8b
 ollama pull bge-m3
+ollama pull dengcao/Qwen3-Reranker-8B:Q8_0
 
 # 4. Start Docker services
 docker compose up -d

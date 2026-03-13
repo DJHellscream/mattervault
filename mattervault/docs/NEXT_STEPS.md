@@ -1,6 +1,6 @@
 # MatterVault - Potential Next Steps
 
-*Updated 2026-03-13*
+*Updated 2026-03-13 (evening)*
 
 ## Recently Completed
 - Chat workflow with conversation persistence + audit logging
@@ -46,6 +46,9 @@
 - **Chat UI polish**: dropdown option dark theme styling, audit page scroll fix, audit table vertical alignment
 - **Cross-encoder reranking**: Qwen3-Reranker-8B scores search results 0-10, reranks top 25 → top 5 before LLM generation
 - **Codex review fixes**: proper db client for prompt reorder transaction, cursor-based audit export streaming, paginated Qdrant scroll for family discovery
+- **Route integration tests**: 73 supertest-based tests covering auth middleware, all CRUD routes, admin gates, transaction correctness
+- **TLS termination**: Caddy reverse proxy via docker-compose.tls.yml overlay, self-signed certs, trust-proxy for client IPs
+- **Ethical walls (per-family access control)**: user_family_access table, userCanAccessFamily helper, enforcement on family dropdown + chat + conversation endpoints, admin CRUD API
 
 ---
 
@@ -59,11 +62,6 @@
 - Fields to add: `document_date`, `correspondent`, `document_type`, `tags`
 - Effort: 3-4 hours (n8n ingestion + chat workflow + Chat UI changes)
 
-**Per-Family Access Control** *(Priority: Low)*
-- Currently open access (any user can query any family)
-- Could restrict users to specific families based on Paperless tag permissions
-- More relevant as user base grows
-- Effort: High
 
 ### AI Quality Upgrades
 
@@ -88,11 +86,10 @@
 
 ### Operations
 
-**Production Hardening** *(Priority: Medium — required before network exposure)*
-- HTTPS/TLS termination (nginx or traefik)
-- Proper secrets management (not .env files)
+**Secrets Management** *(Priority: Low)*
+- Move from .env files to proper secrets management
 - Rate limiting on chat API
-- Effort: 4-6 hours
+- Effort: 2-3 hours
 
 ---
 
@@ -100,12 +97,11 @@
 
 | Task | Effort | Impact | Priority |
 |------|--------|--------|----------|
-| Production hardening | Medium | High | Before network go-live |
 | Metadata filtering | Medium | Medium | Nice to have |
 | Contextual chunking | Medium | Medium | After real-world testing |
-| Per-family access | High | Medium | When needed |
 | Visual Intelligence | High | Medium | Future |
 | Citation export | Medium | Medium | Future |
+| Secrets management | Low | Low | When needed |
 
 ---
 
