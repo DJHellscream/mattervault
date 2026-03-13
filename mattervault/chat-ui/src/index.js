@@ -8,6 +8,7 @@ const auditRoutes = require('./routes/audit');
 const promptsRoutes = require('./routes/prompts');
 const conversationsRoutes = require('./routes/conversations');
 const familyAccessRoutes = require('./routes/family-access');
+const adminUsersRoutes = require('./routes/admin-users');
 const { createDocumentsRouter } = require('./routes/documents');
 const { waitForDatabase, runMigrations } = require('./migrations');
 const { requireAuth } = require('./middleware/auth');
@@ -69,6 +70,9 @@ app.use('/api/audit', auditRoutes);
 // Protected family access admin routes
 app.use('/api/admin/family-access', requireAuth, familyAccessRoutes);
 
+// Protected admin users route
+app.use('/api/admin/users', requireAuth, adminUsersRoutes);
+
 // Protected prompt template routes (auth in route handlers, admin for writes)
 app.use('/api/prompts', promptsRoutes);
 
@@ -88,9 +92,14 @@ app.get('/audit', (req, res) => {
   res.sendFile(path.join(__dirname, '../public/audit.html'));
 });
 
-// Serve prompts admin page (auth check happens client-side)
+// Serve admin console (auth check happens client-side)
+app.get('/admin', (req, res) => {
+  res.sendFile(path.join(__dirname, '../public/admin.html'));
+});
+
+// Legacy redirect
 app.get('/prompts', (req, res) => {
-  res.sendFile(path.join(__dirname, '../public/prompts.html'));
+  res.redirect('/admin');
 });
 
 // Registration is disabled - users authenticate via Paperless
