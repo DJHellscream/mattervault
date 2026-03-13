@@ -1,6 +1,6 @@
 # MatterVault - Potential Next Steps
 
-*Updated 2026-03-12*
+*Updated 2026-03-13*
 
 ## Recently Completed
 - Chat workflow with conversation persistence + audit logging
@@ -44,6 +44,8 @@
 - **Chat markdown rendering**: formatMessage renders headings, lists, horizontal rules, bold/italic properly
 - **SSE error propagation**: stream errors now show "Streaming failed: ..." instead of empty bubbles
 - **Chat UI polish**: dropdown option dark theme styling, audit page scroll fix, audit table vertical alignment
+- **Cross-encoder reranking**: Qwen3-Reranker-8B scores search results 0-10, reranks top 25 → top 5 before LLM generation
+- **Codex review fixes**: proper db client for prompt reorder transaction, cursor-based audit export streaming, paginated Qdrant scroll for family discovery
 
 ---
 
@@ -64,13 +66,6 @@
 - Effort: High
 
 ### AI Quality Upgrades
-
-**Add Cross-Encoder Reranking** *(Priority: Medium)*
-- Problem: Current LLM-based reranking (qwen3:8b scoring 0-10) is slow and less accurate than dedicated rerankers
-- Solution: Use bge-reranker-v2-m3 (~600M params) — designed specifically for reranking
-- Improves RAG accuracy 20-35% over no reranking, with 200-500ms latency per batch
-- Pairs naturally with BGE-M3 embeddings (same model family)
-- Effort: 3-4 hours (new model + n8n pipeline change)
 
 **Contextual Chunking** *(Priority: Low)*
 - Problem: Chunks like "The above provisions apply..." lose meaning without parent section
@@ -105,7 +100,6 @@
 
 | Task | Effort | Impact | Priority |
 |------|--------|--------|----------|
-| Cross-encoder reranking | Medium | High | Best quality improvement |
 | Production hardening | Medium | High | Before network go-live |
 | Metadata filtering | Medium | Medium | Nice to have |
 | Contextual chunking | Medium | Medium | After real-world testing |

@@ -21,7 +21,7 @@ Mattervault employs a 5-zone modular architecture:
 │                              CLIENT LAYER                                   │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │  Chat UI (3007)              │  Health Dashboard (3006)                     │
-│  React + Express.js          │  Real-time monitoring + WebSocket            │
+│  Express.js + static HTML/JS │  Real-time monitoring + WebSocket            │
 └──────────────┬───────────────┴──────────────────────────────────────────────┘
                │
 ┌──────────────▼───────────────────────────────────────────────────────────────┐
@@ -63,7 +63,7 @@ Mattervault employs a 5-zone modular architecture:
 | Workflow Engine | n8n 2.4.4 | Document ingestion, chat orchestration, audit |
 | LLM Runtime | Ollama (native) | Local inference, no external API calls |
 | PDF Parser | Docling (native) | High-fidelity structure extraction |
-| Frontend | Express.js + React | Chat interface, admin tools |
+| Frontend | Express.js + static HTML/JS | Chat interface, admin tools |
 | Monitoring | Custom Dashboard | Real-time health, metrics, alerts |
 
 ### Database Stack
@@ -80,8 +80,8 @@ Mattervault employs a 5-zone modular architecture:
 | Model | Dimensions | Purpose |
 |-------|------------|---------|
 | bge-m3 | 1024-dim | Dense semantic embeddings |
-| qwen3:8b | - | Response generation, reranking |
-| Qwen3-Reranker | 0.6B params | Cross-encoder relevance scoring |
+| qwen3:8b | - | Response generation |
+| dengcao/Qwen3-Reranker-8B:Q8_0 | - | Cross-encoder relevance scoring |
 
 ---
 
@@ -418,8 +418,8 @@ Response: { "status": "completed", "result": "# Markdown..." }
 
 ### Document Processing
 
-- Docling timeout: 300s (large PDFs may require adjustment)
-- Recommended max: 50 pages per PDF
+- Docling timeout: 600s (large PDFs may require adjustment)
+- Recommended max: 200 pages per PDF (split-pdf.py available for larger docs)
 - OCR adds ~2-3s per page for scanned documents
 
 ### Scaling Notes
@@ -442,7 +442,7 @@ PAPERLESS_ADMIN_PASS=<secure-password>
 
 # AI Configuration
 OLLAMA_URL=http://host.docker.internal:11434
-OLLAMA_MODEL=qwen3:8b
+OLLAMA_CHAT_MODEL=qwen3:8b
 CHAT_HISTORY_LIMIT=10
 
 # Database
@@ -496,12 +496,11 @@ redis-cli -p 6379 KEYS "session:*" | wc -l
 
 - Per-family access control (restrict users to specific families)
 - TLS termination with reverse proxy
-- Email alerting for service failures
-- Document change/delete synchronization
+- Metadata filtering (date range, document type, correspondent)
 - Named Entity Recognition for PII redaction
 - Legal-specific fine-tuned models
 
 ---
 
 **Document maintained by**: Mattervault Development Team
-**Last updated**: February 2026
+**Last updated**: March 2026
