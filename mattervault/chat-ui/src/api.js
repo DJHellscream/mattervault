@@ -1,4 +1,5 @@
 const express = require('express');
+const { userCanAccessFamily } = require('./auth');
 const db = require('./db');
 
 function createApiRouter(config) {
@@ -23,6 +24,15 @@ function createApiRouter(config) {
 
       if (!question) {
         return res.status(400).json({ error: 'question is required' });
+      }
+
+      // Ethical walls: verify user has access to this family
+      const hasAccess = await userCanAccessFamily(userId, req.user.role, family_id);
+      if (!hasAccess) {
+        return res.status(403).json({
+          error: 'You do not have access to this matter',
+          code: 'FAMILY_ACCESS_DENIED'
+        });
       }
 
       let conversationId = conversation_id;

@@ -11,6 +11,12 @@ const { createApp, TEST_USER } = require('./test-helpers');
 const { createApiRouter } = require('./api');
 const db = require('./db');
 
+jest.mock('./auth', () => ({
+  userCanAccessFamily: jest.fn().mockResolvedValue(true),
+  verifyAccessToken: jest.fn(),
+  redis: { on: jest.fn(), ping: jest.fn() },
+}));
+
 jest.mock('./db', () => ({
   query: jest.fn(),
   getClient: jest.fn(),
@@ -77,6 +83,17 @@ describe('POST /api/chat', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.conversation_id).toBe('new-conv-id');
+  });
+
+  test('rejects chat for unauthorized family (403)', async () => {
+    const { userCanAccessFamily } = require('./auth');
+    userCanAccessFamily.mockResolvedValueOnce(false);
+
+    const res = await request(app)
+      .post('/api/chat')
+      .send({ family_id: 'restricted', question: 'Hello' });
+    expect(res.status).toBe(403);
+    expect(res.body.code).toBe('FAMILY_ACCESS_DENIED');
   });
 
   test('verifies ownership of existing conversation and returns 404 if not found', async () => {

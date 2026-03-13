@@ -8,6 +8,11 @@
 const request = require('supertest');
 const { createApp, TEST_USER } = require('../test-helpers');
 
+jest.mock('../auth', () => ({
+  userCanAccessFamily: jest.fn().mockResolvedValue(true),
+  verifyAccessToken: jest.fn(),
+}));
+
 jest.mock('../db', () => ({
   query: jest.fn(),
   getClient: jest.fn(),
@@ -148,6 +153,17 @@ describe('POST /api/conversations', () => {
     expect(res.status).toBe(400);
     expect(res.body.code).toBe('VALIDATION_ERROR');
     expect(db.query).not.toHaveBeenCalled();
+  });
+
+  test('rejects conversation creation for unauthorized family (403)', async () => {
+    const { userCanAccessFamily } = require('../auth');
+    userCanAccessFamily.mockResolvedValueOnce(false);
+
+    const res = await request(app)
+      .post('/api/conversations')
+      .send({ family_id: 'restricted' });
+    expect(res.status).toBe(403);
+    expect(res.body.code).toBe('FAMILY_ACCESS_DENIED');
   });
 });
 

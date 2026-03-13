@@ -5,6 +5,7 @@
 
 const express = require('express');
 const FormData = require('form-data');
+const { userCanAccessFamily } = require('../auth');
 const db = require('../db');
 
 const router = express.Router();
@@ -93,6 +94,15 @@ router.post('/', async (req, res) => {
       return res.status(400).json({
         error: 'family_id is required',
         code: 'VALIDATION_ERROR'
+      });
+    }
+
+    // Ethical walls: verify user has access to this family
+    const hasAccess = await userCanAccessFamily(userId, req.user.role, family_id);
+    if (!hasAccess) {
+      return res.status(403).json({
+        error: 'You do not have access to this matter',
+        code: 'FAMILY_ACCESS_DENIED'
       });
     }
 

@@ -5,6 +5,7 @@
 
 const express = require('express');
 const { randomUUID } = require('crypto');
+const { userCanAccessFamily } = require('./auth');
 
 // Professional loading phrases a paralegal might say
 const LOADING_PHRASES = [
@@ -66,6 +67,15 @@ function createStreamingRouter(config) {
       }
       if (!family_id) {
         return res.status(400).json({ error: 'family_id is required' });
+      }
+
+      // Ethical walls: verify user has access to this family
+      const hasAccess = await userCanAccessFamily(userId, req.user.role, family_id);
+      if (!hasAccess) {
+        return res.status(403).json({
+          error: 'You do not have access to this matter',
+          code: 'FAMILY_ACCESS_DENIED'
+        });
       }
 
       // Call n8n - it handles everything: conversation, messages, RAG, audit
