@@ -7,6 +7,7 @@ const authRoutes = require('./routes/auth');
 const auditRoutes = require('./routes/audit');
 const promptsRoutes = require('./routes/prompts');
 const conversationsRoutes = require('./routes/conversations');
+const familyAccessRoutes = require('./routes/family-access');
 const { createDocumentsRouter } = require('./routes/documents');
 const { waitForDatabase, runMigrations } = require('./migrations');
 const { requireAuth } = require('./middleware/auth');
@@ -64,6 +65,9 @@ app.use('/api/documents', requireAuth, createDocumentsRouter(config));
 
 // Protected audit routes (admin only - enforced in route handlers)
 app.use('/api/audit', auditRoutes);
+
+// Protected family access admin routes
+app.use('/api/admin/family-access', requireAuth, familyAccessRoutes);
 
 // Protected prompt template routes (auth in route handlers, admin for writes)
 app.use('/api/prompts', promptsRoutes);
