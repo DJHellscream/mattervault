@@ -1,0 +1,18 @@
+{
+	auto_https disable_redirects
+}
+
+:443 {
+	tls internal
+	reverse_proxy matterchat:3000
+}
+
+:3006 {
+	tls internal
+	reverse_proxy matterdash:3000
+}
+
+:8000 {
+	tls internal
+	reverse_proxy mattervault:8000
+}

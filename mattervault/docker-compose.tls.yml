@@ -1,0 +1,46 @@
+# TLS overlay — use with: docker compose -f docker-compose.yml -f docker-compose.tls.yml up -d
+# Adds Caddy reverse proxy for HTTPS on ports 443, 3006, 8000
+# Services stop exposing ports directly; all traffic goes through Caddy.
+services:
+  # Override: remove direct host port bindings
+  paperless:
+    ports: !override []
+
+  chat-ui:
+    ports: !override []
+    environment:
+      - NODE_ENV=production
+
+  health-dashboard:
+    ports: !override []
+
+  n8n:
+    ports: !override []
+
+  qdrant:
+    ports: !override []
+
+  # New: Caddy reverse proxy for TLS termination
+  proxy:
+    image: caddy:2-alpine
+    container_name: matterproxy
+    restart: always
+    ports:
+      - "443:443"
+      - "3006:3006"
+      - "8000:8000"
+      - "80:80"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - matternet
+    depends_on:
+      - chat-ui
+      - health-dashboard
+      - paperless
+
+volumes:
+  caddy_data:
+  caddy_config:
