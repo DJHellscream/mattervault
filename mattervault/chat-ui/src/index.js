@@ -97,10 +97,6 @@ app.get('/admin', (req, res) => {
   res.sendFile(path.join(__dirname, '../public/admin.html'));
 });
 
-// Legacy redirect
-app.get('/prompts', (req, res) => {
-  res.redirect('/admin');
-});
 
 // Registration is disabled - users authenticate via Paperless
 // Redirect old register links to login
