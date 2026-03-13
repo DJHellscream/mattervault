@@ -241,7 +241,7 @@ router.get('/families', requireAuth, async (req, res) => {
     }
 
     // Fetch families from Paperless
-    const families = await auth.fetchUserFamilies(user.paperless_token);
+    const families = await auth.fetchUserFamilies(user.paperless_token, req.user.id, req.user.role);
 
     res.json({ families });
   } catch (err) {

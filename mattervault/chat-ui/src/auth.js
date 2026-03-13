@@ -90,7 +90,7 @@ async function fetchPaperlessUser(token) {
  * @param {string} token - Paperless API token
  * @returns {Promise<Array>} Array of family tags with document counts
  */
-async function fetchUserFamilies(token) {
+async function fetchUserFamilies(token, userId, role) {
   const QDRANT_URL = process.env.QDRANT_URL || 'http://mattermemory:6333';
   const QDRANT_COLLECTION = process.env.QDRANT_COLLECTION || 'mattervault_documents';
 
@@ -131,12 +131,22 @@ async function fetchUserFamilies(token) {
       nextPageOffset = qdrantData.result?.next_page_offset || null;
     } while (nextPageOffset);
 
-    return Object.keys(docsByFamily).sort().map(fid => ({
+    const allFamilies = Object.keys(docsByFamily).sort().map(fid => ({
       id: fid,
       name: fid,
       slug: fid,
       document_count: docsByFamily[fid].size
     }));
+
+    // Ethical walls: non-admin users only see families they have access to
+    if (role === 'admin' || !userId) return allFamilies;
+
+    const { rows: accessRows } = await db.query(
+      'SELECT family_id FROM user_family_access WHERE user_id = $1',
+      [userId]
+    );
+    const allowedFamilies = new Set(accessRows.map(r => r.family_id));
+    return allFamilies.filter(f => allowedFamilies.has(f.id));
   } catch (err) {
     console.error('Error fetching families:', err.message);
     return [];
@@ -379,6 +389,23 @@ async function getUserByPaperlessUsername(username) {
   return rows[0] || null;
 }
 
+/**
+ * Check if a user has access to a specific family
+ * Admins always have access. Regular users need an entry in user_family_access.
+ * @param {string} userId - User UUID
+ * @param {string} role - User role ('admin' or 'user')
+ * @param {string} familyId - Family ID to check
+ * @returns {Promise<boolean>}
+ */
+async function userCanAccessFamily(userId, role, familyId) {
+  if (role === 'admin') return true;
+  const { rows } = await db.query(
+    'SELECT 1 FROM user_family_access WHERE user_id = $1 AND family_id = $2',
+    [userId, familyId]
+  );
+  return rows.length > 0;
+}
+
 module.exports = {
   verifyPaperlessCredentials,
   fetchPaperlessUser,
@@ -394,5 +421,6 @@ module.exports = {
   cleanupExpiredSessions,
   getUserById,
   getUserByPaperlessUsername,
+  userCanAccessFamily,
   redis
 };
